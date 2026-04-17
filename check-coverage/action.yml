@@ -1,0 +1,15 @@
+name: Check coverage
+description: Run tests with coverage and upload results to Codecov
+inputs:
+  codecov-token:
+    description: Token required to post to Codecov
+    required: true
+runs:
+  using: composite
+  steps:
+    - run: pnpm coverage
+      shell: bash
+    - uses: codecov/codecov-action@v5
+      with:
+        token: ${{ inputs.codecov-token }}
+        fail_ci_if_error: true

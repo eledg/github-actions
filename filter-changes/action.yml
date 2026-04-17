@@ -1,0 +1,22 @@
+name: Filter changes
+description: Outputs a boolean indicating whether specified paths were modified
+inputs:
+  paths:
+    description: Comma-separated list of paths to watch (e.g., apps/name,packages/ui)
+    required: true
+outputs:
+  result:
+    description: Whether matching files were changed (true/false)
+    value: ${{ steps.set-result.outputs.result }}
+runs:
+  using: composite
+  steps:
+    - id: set-result
+      run: ${{ github.action_path }}/filter-changes.sh
+      shell: bash
+      env:
+        INPUT_PATHS: ${{ inputs.paths }}
+        GITHUB_BASE_REF: ${{ github.base_ref }}
+        GITHUB_EVENT_BEFORE: ${{ github.event.before }}
+        GITHUB_SHA: ${{ github.sha }}
+        GITHUB_EVENT_NAME: ${{ github.event_name }}

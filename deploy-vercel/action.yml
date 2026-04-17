@@ -1,0 +1,28 @@
+name: Deploy to Vercel
+description: Deploy a Vercel project to preview or production
+inputs:
+  production:
+    description: Deploy to production
+    required: false
+    default: 'false'
+  vercel-org-id:
+    description: Vercel organisation ID
+    required: true
+  vercel-project-id:
+    description: Vercel project ID
+    required: true
+  vercel-token:
+    description: Vercel token
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Install Vercel CLI
+      run: npm i -g vercel
+      shell: bash
+    - name: Deploy project artifacts to Vercel
+      run: vercel ${{ inputs.production == 'true' && '--prod' || '' }} --token=${{ inputs.vercel-token }} --logs
+      shell: bash
+      env:
+        VERCEL_ORG_ID: ${{ inputs.vercel-org-id }}
+        VERCEL_PROJECT_ID: ${{ inputs.vercel-project-id }}
