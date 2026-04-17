@@ -3,15 +3,15 @@ description: Install Node.js, pnpm, restore the pnpm store cache, and install de
 runs:
   using: composite
   steps:
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@v6
       with:
         node-version: 24
-    - uses: pnpm/action-setup@v4
+    - uses: pnpm/action-setup@v5
       name: Install pnpm
     - name: Get pnpm store directory
       shell: bash
       run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-    - uses: actions/cache@v4
+    - uses: actions/cache@v5
       name: Setup pnpm cache
       with:
         path: ${{ env.STORE_PATH }}
