@@ -46,11 +46,13 @@ Runs `pnpm coverage` and uploads results to Codecov.
 - uses: eledg/github-actions/check-coverage@v1
   with:
     codecov-token: ${{ secrets.CODECOV_TOKEN }}
+    actor: ${{ github.actor }}
 ```
 
-| Input | Required | Description |
-|---|---|---|
-| `codecov-token` | Yes | Codecov upload token |
+| Input | Required | Default | Description |
+|---|---|---|---|
+| `codecov-token` | Yes | — | Codecov upload token |
+| `actor` | No | `''` | GitHub actor (`github.actor`) — upload is skipped for `dependabot[bot]` and `dependabot-preview[bot]` |
 
 ---
 
