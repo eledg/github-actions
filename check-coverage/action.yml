@@ -4,17 +4,12 @@ inputs:
   codecov-token:
     description: Token required to post to Codecov
     required: true
-  actor:
-    description: The GitHub actor (github.actor) — used to skip Codecov upload for dependabot
-    required: false
-    default: ''
 runs:
   using: composite
   steps:
     - run: pnpm coverage
       shell: bash
     - uses: codecov/codecov-action@v6
-      if: ${{ inputs.actor != 'dependabot[bot]' && inputs.actor != 'dependabot-preview[bot]' }}
       with:
         token: ${{ inputs.codecov-token }}
         fail_ci_if_error: true
