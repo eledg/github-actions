@@ -1,0 +1,19 @@
+name: Check Action Dependencies
+description: >
+  Scans composite action.yml files for outdated action dependencies and opens
+  a PR with major-version updates. Mirrors what Dependabot does for workflow
+  files, but for action.yml files which Dependabot does not cover.
+inputs:
+  github-token:
+    description: >
+      GitHub token with contents:write and pull-requests:write permissions.
+      Pass secrets.GITHUB_TOKEN from the calling workflow.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Check and update action dependencies
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: bash ${{ github.action_path }}/check-action-dependencies.sh

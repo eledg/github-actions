@@ -29,12 +29,12 @@ Deploys a Vercel project to preview or production.
     vercel-token: ${{ secrets.VERCEL_TOKEN }}
 ```
 
-| Input | Required | Default | Description |
-|---|---|---|---|
-| `production` | No | `false` | Deploy to production (`--prod`) |
-| `vercel-org-id` | Yes | — | Vercel organisation ID |
-| `vercel-project-id` | Yes | — | Vercel project ID |
-| `vercel-token` | Yes | — | Vercel auth token |
+| Input               | Required | Default | Description                     |
+| ------------------- | -------- | ------- | ------------------------------- |
+| `production`        | No       | `false` | Deploy to production (`--prod`) |
+| `vercel-org-id`     | Yes      | —       | Vercel organisation ID          |
+| `vercel-project-id` | Yes      | —       | Vercel project ID               |
+| `vercel-token`      | Yes      | —       | Vercel auth token               |
 
 ---
 
@@ -46,13 +46,11 @@ Runs `pnpm coverage` and uploads results to Codecov.
 - uses: eledg/github-actions/check-coverage@v1
   with:
     codecov-token: ${{ secrets.CODECOV_TOKEN }}
-    actor: ${{ github.actor }}
 ```
 
-| Input | Required | Default | Description |
-|---|---|---|---|
-| `codecov-token` | Yes | — | Codecov upload token |
-| `actor` | No | `''` | GitHub actor (`github.actor`) — upload is skipped for `dependabot[bot]` and `dependabot-preview[bot]` |
+| Input           | Required | Description          |
+| --------------- | -------- | -------------------- |
+| `codecov-token` | Yes      | Codecov upload token |
 
 ---
 
@@ -70,12 +68,12 @@ Outputs a boolean indicating whether any of the specified paths were modified in
     paths: apps/ui,packages/shared
 ```
 
-| Input | Required | Description |
-|---|---|---|
-| `paths` | Yes | Comma-separated list of paths to watch |
+| Input   | Required | Description                            |
+| ------- | -------- | -------------------------------------- |
+| `paths` | Yes      | Comma-separated list of paths to watch |
 
-| Output | Description |
-|---|---|
+| Output   | Description                                             |
+| -------- | ------------------------------------------------------- |
 | `result` | `true` if any matching files changed, otherwise `false` |
 
 ---
@@ -90,10 +88,10 @@ Assumes an AWS IAM role via OIDC and runs `pnpm --filter infra synth`. Any app-s
     role-to-assume: arn:aws:iam::123456789012:role/GitHubActionsOIDCRole-eu-west-1
 ```
 
-| Input | Required | Default | Description |
-|---|---|---|---|
-| `role-to-assume` | Yes | — | IAM role ARN to assume via OIDC |
-| `aws-region` | No | `eu-west-1` | AWS region |
+| Input            | Required | Default     | Description                     |
+| ---------------- | -------- | ----------- | ------------------------------- |
+| `role-to-assume` | Yes      | —           | IAM role ARN to assume via OIDC |
+| `aws-region`     | No       | `eu-west-1` | AWS region                      |
 
 Requires `id-token: write` permission on the calling job.
 
@@ -109,12 +107,48 @@ Assumes an AWS IAM role via OIDC and runs `pnpm --filter infra prod:diff`. On pu
     role-to-assume: arn:aws:iam::123456789012:role/GitHubActionsOIDCRole-eu-west-1
 ```
 
-| Input | Required | Default | Description |
-|---|---|---|---|
-| `role-to-assume` | Yes | — | IAM role ARN to assume via OIDC |
-| `aws-region` | No | `eu-west-1` | AWS region |
+| Input            | Required | Default     | Description                     |
+| ---------------- | -------- | ----------- | ------------------------------- |
+| `role-to-assume` | Yes      | —           | IAM role ARN to assume via OIDC |
+| `aws-region`     | No       | `eu-west-1` | AWS region                      |
 
 Requires `id-token: write` and `pull-requests: write` permissions on the calling job.
+
+---
+
+### `check-action-dependencies`
+
+Scans composite `action.yml` files for outdated action dependencies and opens a PR with major-version updates. Dependabot covers `.github/workflows/` files but not composite action files — this fills that gap.
+
+Add a scheduled workflow to any repo that uses composite actions:
+
+```yaml
+name: Check Action Dependencies
+
+on:
+  schedule:
+    - cron: "0 3 * * 5" # Every Friday at 3am UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: eledg/github-actions/check-action-dependencies@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+| Input          | Required | Description                                                          |
+| -------------- | -------- | -------------------------------------------------------------------- |
+| `github-token` | Yes      | GitHub token — pass `secrets.GITHUB_TOKEN` from the calling workflow |
+
+Requires `contents: write` and `pull-requests: write` permissions on the calling workflow. If updates are found, the action commits the changes to a `deps/action-updates` branch and opens a PR. If a PR from a previous run is still open, it force-pushes to that branch instead of opening a duplicate.
 
 ---
 
@@ -132,6 +166,8 @@ git tag -f v1
 git push origin v1 --force
 ```
 
-## Dependabot
+## Dependency updates
 
-This repo has Dependabot configured to keep the upstream actions (e.g. `actions/setup-node`, `pnpm/action-setup`) up to date weekly.
+Upstream actions referenced in `.github/workflows/` are kept up to date by Dependabot (configured in `.github/dependabot.yml`), which runs weekly and groups all updates into a single PR.
+
+Upstream actions referenced inside composite `action.yml` files are kept up to date by the `check-action-dependencies` workflow in this repo, which runs every Friday and opens a PR with any major-version bumps. Consuming repos can use the `check-action-dependencies` action to get the same coverage for their own composite actions.
