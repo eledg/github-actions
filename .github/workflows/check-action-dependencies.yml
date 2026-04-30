@@ -1,0 +1,21 @@
+name: Check Action Dependencies
+
+on:
+  schedule:
+    - cron: '0 3 * * 5' # Every Friday at 3am UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Find outdated actions and open a PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash check-action-dependencies/check-action-dependencies.sh
