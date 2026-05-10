@@ -70,7 +70,7 @@ runs:
       run: |
         corepack enable
         corepack prepare pnpm@${LATEST} --activate
-        pnpm install
+        pnpm install --ignore-scripts
     - name: Create pull request
       if: steps.latest.outputs.version != steps.current.outputs.version
       uses: peter-evans/create-pull-request@v8
