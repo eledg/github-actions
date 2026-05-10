@@ -152,6 +152,30 @@ Requires `contents: write` and `pull-requests: write` permissions on the calling
 
 ---
 
+### `update-pnpm`
+
+Checks for a newer pnpm version on npm and opens a PR to update the `packageManager` field in `package.json` and regenerate the lockfile. No-ops if already on the latest version.
+
+```yaml
+- uses: actions/checkout@v6
+- uses: eledg/github-actions/update-pnpm@v1
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    reviewers: your-github-username
+    assignees: your-github-username
+```
+
+| Input          | Required | Default | Description                                                          |
+| -------------- | -------- | ------- | -------------------------------------------------------------------- |
+| `github-token` | Yes      | —       | GitHub token — pass `secrets.GITHUB_TOKEN` from the calling workflow |
+| `reviewers`    | No       | `''`    | Comma or newline separated list of pull request reviewers            |
+| `assignees`    | No       | `''`    | Comma or newline separated list of pull request assignees            |
+| `labels`       | No       | `build` | Labels to apply to the pull request                                  |
+
+Requires `contents: write` and `pull-requests: write` permissions on the calling workflow.
+
+---
+
 ## Versioning
 
 Consuming repos pin to a major version tag (e.g. `@v1`). Dependabot in each consuming repo will open PRs when a new version is published here.

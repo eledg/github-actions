@@ -1,0 +1,84 @@
+name: Update pnpm
+description: >
+  Checks for a newer pnpm version and opens a PR to update the packageManager
+  field in package.json and regenerate the lockfile.
+inputs:
+  github-token:
+    description: >
+      GitHub token with contents:write and pull-requests:write permissions.
+      Pass secrets.GITHUB_TOKEN from the calling workflow.
+    required: true
+  reviewers:
+    description: Comma or newline separated list of pull request reviewers.
+    required: false
+    default: ''
+  assignees:
+    description: Comma or newline separated list of pull request assignees.
+    required: false
+    default: ''
+  labels:
+    description: Labels to apply to the pull request.
+    required: false
+    default: build
+runs:
+  using: composite
+  steps:
+    - name: Get latest pnpm version
+      id: latest
+      shell: bash
+      run: echo "version=$(npm show pnpm version)" >> $GITHUB_OUTPUT
+    - name: Get current pnpm version
+      id: current
+      shell: bash
+      run: echo "version=$(node -p "require('./package.json').packageManager.split('@')[1]")" >> $GITHUB_OUTPUT
+    - name: Determine bump type
+      if: steps.latest.outputs.version != steps.current.outputs.version
+      id: bump
+      shell: bash
+      env:
+        CURRENT: ${{ steps.current.outputs.version }}
+        LATEST: ${{ steps.latest.outputs.version }}
+      run: |
+        CURRENT_MAJOR=$(echo $CURRENT | cut -d. -f1)
+        CURRENT_MINOR=$(echo $CURRENT | cut -d. -f2)
+        LATEST_MAJOR=$(echo $LATEST | cut -d. -f1)
+        LATEST_MINOR=$(echo $LATEST | cut -d. -f2)
+        if [ "$LATEST_MAJOR" != "$CURRENT_MAJOR" ]; then
+          echo "type=major" >> $GITHUB_OUTPUT
+        elif [ "$LATEST_MINOR" != "$CURRENT_MINOR" ]; then
+          echo "type=minor" >> $GITHUB_OUTPUT
+        else
+          echo "type=patch" >> $GITHUB_OUTPUT
+        fi
+    - name: Update packageManager field
+      if: steps.latest.outputs.version != steps.current.outputs.version
+      shell: bash
+      env:
+        LATEST: ${{ steps.latest.outputs.version }}
+      run: sed -i "s/\"packageManager\": \"pnpm@[^\"]*\"/\"packageManager\": \"pnpm@${LATEST}\"/" package.json
+    - name: Regenerate lockfile
+      if: steps.latest.outputs.version != steps.current.outputs.version
+      shell: bash
+      env:
+        LATEST: ${{ steps.latest.outputs.version }}
+      run: |
+        corepack enable
+        corepack prepare pnpm@${LATEST} --activate
+        pnpm install
+    - name: Create pull request
+      if: steps.latest.outputs.version != steps.current.outputs.version
+      uses: peter-evans/create-pull-request@v8
+      with:
+        token: ${{ inputs.github-token }}
+        commit-message: 'build: update pnpm ${{ steps.current.outputs.version }} → ${{ steps.latest.outputs.version }} (${{ steps.bump.outputs.type }})'
+        title: 'build: update pnpm ${{ steps.current.outputs.version }} → ${{ steps.latest.outputs.version }} (${{ steps.bump.outputs.type }})'
+        body: |
+          Automated pnpm version update from `${{ steps.current.outputs.version }}` to `${{ steps.latest.outputs.version }}`.
+
+          ---
+          - **Release notes**: [pnpm v${{ steps.latest.outputs.version }}](https://github.com/pnpm/pnpm/releases/tag/v${{ steps.latest.outputs.version }})
+          - **Changelog**: [v${{ steps.current.outputs.version }}...v${{ steps.latest.outputs.version }}](https://github.com/pnpm/pnpm/compare/v${{ steps.current.outputs.version }}...v${{ steps.latest.outputs.version }})
+        branch: update-pnpm-${{ steps.latest.outputs.version }}
+        labels: ${{ inputs.labels }}
+        reviewers: ${{ inputs.reviewers }}
+        assignees: ${{ inputs.assignees }}
