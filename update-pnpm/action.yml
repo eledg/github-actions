@@ -57,6 +57,11 @@ runs:
         LATEST: ${{ steps.latest.outputs.version }}
       run: |
         sed -i "s/\"packageManager\": \"pnpm@[^\"]*\"/\"packageManager\": \"pnpm@${LATEST}\"/" package.json
+    - name: Set up Node.js
+      if: steps.latest.outputs.version != steps.current.outputs.version
+      uses: actions/setup-node@v6
+      with:
+        node-version: 24
     - name: Regenerate lockfile
       if: steps.latest.outputs.version != steps.current.outputs.version
       shell: bash
