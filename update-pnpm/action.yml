@@ -55,7 +55,8 @@ runs:
       shell: bash
       env:
         LATEST: ${{ steps.latest.outputs.version }}
-      run: sed -i "s/\"packageManager\": \"pnpm@[^\"]*\"/\"packageManager\": \"pnpm@${LATEST}\"/" package.json
+      run: |
+        sed -i "s/\"packageManager\": \"pnpm@[^\"]*\"/\"packageManager\": \"pnpm@${LATEST}\"/" package.json
     - name: Regenerate lockfile
       if: steps.latest.outputs.version != steps.current.outputs.version
       shell: bash
