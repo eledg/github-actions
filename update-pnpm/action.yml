@@ -61,7 +61,7 @@ runs:
       if: steps.latest.outputs.version != steps.current.outputs.version
       uses: actions/setup-node@v6
       with:
-        node-version: 24
+        node-version: lts/*
     - name: Regenerate lockfile
       if: steps.latest.outputs.version != steps.current.outputs.version
       shell: bash
