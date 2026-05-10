@@ -6,7 +6,7 @@ runs:
     - uses: actions/setup-node@v6
       with:
         node-version: 24
-    - uses: pnpm/action-setup@v5
+    - uses: pnpm/action-setup@v6
       name: Install pnpm
     - name: Get pnpm store directory
       shell: bash
