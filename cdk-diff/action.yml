@@ -8,6 +8,10 @@ inputs:
     description: AWS region
     required: false
     default: eu-west-1
+outputs:
+  comment-id:
+    description: ID of the created/updated comment
+    value: ${{ steps.comment.outputs.result }}
 runs:
   using: composite
   steps:
@@ -25,8 +29,11 @@ runs:
       run: pnpm --filter infra prod:diff > cdk-diff.txt || true
       shell: bash
     - name: Comment on PR
+      id: comment
       if: ${{ github.event_name == 'pull_request' }}
-      run: ${{ github.action_path }}/post-pr-comment.sh
-      shell: bash
-      env:
-        GH_TOKEN: ${{ github.token }}
+      uses: actions/github-script@v9
+      with:
+        result-encoding: string
+        script: |
+          const scriptModule = require('${{ github.action_path }}/script.js');
+          return await scriptModule({ github, context });
