@@ -1,0 +1,49 @@
+name: Drizzle Migration Preview
+description: Create or update a PR comment with Drizzle migration SQL preview and automated safety checks
+inputs:
+  base-ref:
+    description: Base branch to compare against (e.g., main)
+    required: true
+  has-changes:
+    description: Whether there are schema or migration changes
+    required: true
+  schema-path:
+    description: Path prefix for Drizzle schema files
+    required: false
+    default: packages/db/src/schema/
+  migrations-path:
+    description: Path prefix for Drizzle migration SQL files
+    required: false
+    default: packages/db/src/migrations/
+  generate-command:
+    description: Command to generate migrations (shown in hint when migrations are missing)
+    required: false
+    default: pnpm --filter db generate
+  github-token:
+    description: GitHub token for API access
+    required: false
+    default: ${{ github.token }}
+outputs:
+  comment-id:
+    description: ID of the created/updated comment
+    value: ${{ steps.comment.outputs.result }}
+runs:
+  using: composite
+  steps:
+    - name: Post migration preview to PR
+      id: comment
+      uses: actions/github-script@v9
+      with:
+        github-token: ${{ inputs.github-token }}
+        result-encoding: string
+        script: |
+          const scriptModule = require('${{ github.action_path }}/script.js');
+          return await scriptModule({
+            github,
+            context,
+            baseRef: '${{ inputs.base-ref }}',
+            hasChanges: '${{ inputs.has-changes }}' === 'true',
+            schemaPath: '${{ inputs.schema-path }}',
+            migrationsPath: '${{ inputs.migrations-path }}',
+            generateCommand: '${{ inputs.generate-command }}',
+          });
