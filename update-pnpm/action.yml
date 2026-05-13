@@ -23,14 +23,20 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Get latest pnpm version
-      id: latest
-      shell: bash
-      run: echo "version=$(npm show pnpm version)" >> $GITHUB_OUTPUT
     - name: Get current pnpm version
       id: current
       shell: bash
-      run: echo "version=$(node -p "require('./package.json').packageManager.split('@')[1]")" >> $GITHUB_OUTPUT
+      run: |
+        CURRENT_VERSION=$(node -p "require('./package.json').packageManager.match(/pnpm@([^+]+)/)[1]")
+        echo "version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+
+    - name: Get latest pnpm version
+      id: latest
+      shell: bash
+      run: |
+        LATEST_VERSION=$(npm view pnpm version)
+        echo "version=$LATEST_VERSION" >> "$GITHUB_OUTPUT"
+
     - name: Determine bump type
       if: steps.latest.outputs.version != steps.current.outputs.version
       id: bump
@@ -39,52 +45,122 @@ runs:
         CURRENT: ${{ steps.current.outputs.version }}
         LATEST: ${{ steps.latest.outputs.version }}
       run: |
-        CURRENT_MAJOR=$(echo $CURRENT | cut -d. -f1)
-        CURRENT_MINOR=$(echo $CURRENT | cut -d. -f2)
-        LATEST_MAJOR=$(echo $LATEST | cut -d. -f1)
-        LATEST_MINOR=$(echo $LATEST | cut -d. -f2)
-        if [ "$LATEST_MAJOR" != "$CURRENT_MAJOR" ]; then
-          echo "type=major" >> $GITHUB_OUTPUT
-        elif [ "$LATEST_MINOR" != "$CURRENT_MINOR" ]; then
-          echo "type=minor" >> $GITHUB_OUTPUT
+        IFS='.' read -r CUR_MAJOR CUR_MINOR _ <<< "$CURRENT"
+        IFS='.' read -r LAT_MAJOR LAT_MINOR _ <<< "$LATEST"
+        if [ "$CUR_MAJOR" != "$LAT_MAJOR" ]; then
+          echo "type=major" >> "$GITHUB_OUTPUT"
+        elif [ "$CUR_MINOR" != "$LAT_MINOR" ]; then
+          echo "type=minor" >> "$GITHUB_OUTPUT"
         else
-          echo "type=patch" >> $GITHUB_OUTPUT
+          echo "type=patch" >> "$GITHUB_OUTPUT"
         fi
+
+    - name: Set up Node.js
+      if: steps.latest.outputs.version != steps.current.outputs.version
+      uses: actions/setup-node@v6
+      with:
+        node-version: lts/*
+
     - name: Update packageManager field
       if: steps.latest.outputs.version != steps.current.outputs.version
       shell: bash
       env:
         LATEST: ${{ steps.latest.outputs.version }}
       run: |
-        sed -i "s/\"packageManager\": \"pnpm@[^\"]*\"/\"packageManager\": \"pnpm@${LATEST}\"/" package.json
-    - name: Set up Node.js
-      if: steps.latest.outputs.version != steps.current.outputs.version
-      uses: actions/setup-node@v6
-      with:
-        node-version: lts/*
+        corepack enable
+        corepack prepare "pnpm@$LATEST" --activate
+
+        # Try corepack use to update package.json with the correct integrity hash
+        corepack use "pnpm@$LATEST" 2>&1 || true
+
+        # Fall back to manual update if corepack use didn't write the new version
+        CURRENT_PM=$(node -p "require('./package.json').packageManager")
+        if ! echo "$CURRENT_PM" | grep -q "$LATEST"; then
+          HASH=$(corepack prepare "pnpm@$LATEST" --activate 2>&1 | grep -oP 'sha512\.[a-fA-F0-9]+' || true)
+          if [ -n "$HASH" ]; then
+            node -e "
+              const fs = require('fs');
+              const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+              pkg.packageManager = 'pnpm@$LATEST+$HASH';
+              fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+            "
+          else
+            node -e "
+              const fs = require('fs');
+              const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+              pkg.packageManager = 'pnpm@$LATEST';
+              fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+            "
+          fi
+        fi
+
     - name: Regenerate lockfile
       if: steps.latest.outputs.version != steps.current.outputs.version
       shell: bash
-      env:
-        LATEST: ${{ steps.latest.outputs.version }}
       run: |
         corepack enable
-        corepack prepare pnpm@${LATEST} --activate
-        pnpm install --ignore-scripts
+        pnpm install --no-frozen-lockfile --ignore-scripts
+
+    - name: Build PR body
+      if: steps.latest.outputs.version != steps.current.outputs.version
+      id: pr-body
+      shell: bash
+      env:
+        CURRENT: ${{ steps.current.outputs.version }}
+        LATEST: ${{ steps.latest.outputs.version }}
+        BUMP: ${{ steps.bump.outputs.type }}
+      run: |
+        BODY="## pnpm upgrade: \`$CURRENT\` → \`$LATEST\` ($BUMP)
+
+        ### Links
+
+        - 📋 [Changelog](https://github.com/pnpm/pnpm/blob/main/CHANGELOG.md)
+        - 🏷️ [Release notes for v$LATEST](https://github.com/pnpm/pnpm/releases/tag/v$LATEST)
+        - 📦 [npm package](https://www.npmjs.com/package/pnpm/v/$LATEST)"
+
+        if [ "$BUMP" = "major" ]; then
+          BODY="$BODY
+
+        ### ⚠️ Breaking changes
+
+        This is a **major version** upgrade. Please review the [release notes](https://github.com/pnpm/pnpm/releases/tag/v$LATEST) carefully for breaking changes.
+
+        Major version upgrades may require updates to:
+        - \`pnpm-lock.yaml\` format
+        - \`.npmrc\` configuration options
+        - CI/CD workflows and scripts
+        - Node.js version requirements
+        - Workspace configuration (\`pnpm-workspace.yaml\`)
+        - Lifecycle script behaviour"
+        fi
+
+        {
+          echo "body<<EOF"
+          echo "$BODY"
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"
+
     - name: Create pull request
       if: steps.latest.outputs.version != steps.current.outputs.version
+      id: create-pr
       uses: peter-evans/create-pull-request@v8
       with:
         token: ${{ inputs.github-token }}
         commit-message: 'build: update pnpm ${{ steps.current.outputs.version }} → ${{ steps.latest.outputs.version }} (${{ steps.bump.outputs.type }})'
         title: 'build: update pnpm ${{ steps.current.outputs.version }} → ${{ steps.latest.outputs.version }} (${{ steps.bump.outputs.type }})'
-        body: |
-          Automated pnpm version update from `${{ steps.current.outputs.version }}` to `${{ steps.latest.outputs.version }}`.
-
-          ---
-          - **Release notes**: [pnpm v${{ steps.latest.outputs.version }}](https://github.com/pnpm/pnpm/releases/tag/v${{ steps.latest.outputs.version }})
-          - **Changelog**: [v${{ steps.current.outputs.version }}...v${{ steps.latest.outputs.version }}](https://github.com/pnpm/pnpm/compare/v${{ steps.current.outputs.version }}...v${{ steps.latest.outputs.version }})
+        body: ${{ steps.pr-body.outputs.body }}
         branch: update-pnpm-${{ steps.latest.outputs.version }}
         labels: ${{ inputs.labels }}
         reviewers: ${{ inputs.reviewers }}
         assignees: ${{ inputs.assignees }}
+
+    - name: Ask Copilot to review major upgrades
+      if: steps.latest.outputs.version != steps.current.outputs.version && steps.bump.outputs.type == 'major'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        CURRENT: ${{ steps.current.outputs.version }}
+        LATEST: ${{ steps.latest.outputs.version }}
+        PR_NUMBER: ${{ steps.create-pr.outputs.pull-request-number }}
+      run: |
+        gh pr comment "$PR_NUMBER" --body "@copilot This is a **major version** upgrade of pnpm ($CURRENT → $LATEST). Please review the [release notes](https://github.com/pnpm/pnpm/releases/tag/v$LATEST) and check whether any files in this repository need updating due to breaking changes — for example \`pnpm-lock.yaml\` format, \`.npmrc\` options, \`pnpm-workspace.yaml\`, CI workflows, or Node.js version requirements."
