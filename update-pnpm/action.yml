@@ -28,6 +28,7 @@ runs:
       shell: bash
       run: |
         CURRENT_VERSION=$(node -p "require('./package.json').packageManager.match(/pnpm@([^+]+)/)[1]")
+        echo "Current pnpm version: $CURRENT_VERSION"
         echo "version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
 
     - name: Get latest pnpm version
@@ -35,6 +36,7 @@ runs:
       shell: bash
       run: |
         LATEST_VERSION=$(npm view pnpm version)
+        echo "Latest pnpm version: $LATEST_VERSION"
         echo "version=$LATEST_VERSION" >> "$GITHUB_OUTPUT"
 
     - name: Determine bump type
