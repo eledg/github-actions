@@ -184,6 +184,18 @@ Requires `contents: write` and `pull-requests: write` permissions on the calling
 
 ---
 
+### `setup-playwright`
+
+Installs Playwright Chromium for the `ui` workspace with caching. On a cache hit, only the system dependencies are installed (skipping the full browser download).
+
+```yaml
+- uses: eledg/github-actions/setup-playwright@v1
+```
+
+No inputs.
+
+---
+
 ## Versioning
 
 Consuming repos pin to a major version tag (e.g. `@v1`). Dependabot in each consuming repo will open PRs when a new version is published here.

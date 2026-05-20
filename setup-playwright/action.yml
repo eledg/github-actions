@@ -1,0 +1,19 @@
+name: Setup Playwright
+description: Install Playwright Chromium with caching
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@v4
+      id: playwright-cache
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+
+    - run: pnpm --filter ui exec playwright install --with-deps chromium
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
+      shell: bash
+
+    - run: pnpm --filter ui exec playwright install-deps chromium
+      if: steps.playwright-cache.outputs.cache-hit == 'true'
+      shell: bash
