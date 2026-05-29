@@ -186,6 +186,38 @@ Requires `contents: write` and `pull-requests: write` permissions on the calling
 
 ---
 
+### `update-turbo`
+
+Checks for a newer turbo version on npm and opens a PR to update using `@turbo/codemod`, which migrates `turbo.json` and other config files automatically. No-ops if already on the latest version.
+
+```yaml
+- uses: actions/checkout@v6
+- uses: eledg/github-actions/update-turbo@v1
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    reviewers: your-github-username
+    assignees: your-github-username
+```
+
+| Input          | Required | Default | Description                                                    |
+| -------------- | -------- | ------- | -------------------------------------------------------------- |
+| `github-token` | Yes      | —       | GitHub token with `contents: write` and `pull-requests: write` |
+| `reviewers`    | No       | `''`    | Comma or newline separated list of pull request reviewers      |
+| `assignees`    | No       | `''`    | Comma or newline separated list of pull request assignees      |
+| `labels`       | No       | `build` | Labels to apply to the pull request                            |
+
+Requires `contents: write` and `pull-requests: write` permissions on the calling workflow.
+
+> **Note:** PRs created with `secrets.GITHUB_TOKEN` will not trigger `pull_request` workflows in the consuming repo — this is a GitHub limitation to prevent recursive runs. If you need the opened PR to run your CI, pass a PAT instead:
+>
+> ```yaml
+> github-token: ${{ secrets.PAT_TOKEN }}
+> ```
+>
+> The PAT needs `contents: write` and `pull-requests: write` scopes. When a PAT is used, GitHub treats the PR as user-initiated and `pull_request` fires normally.
+
+---
+
 ### `setup-playwright`
 
 Installs Playwright Chromium for the `ui` workspace with caching. On a cache hit, only the system dependencies are installed (skipping the full browser download).
