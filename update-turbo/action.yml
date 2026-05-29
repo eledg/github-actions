@@ -1,0 +1,140 @@
+name: Update turbo
+description: >
+  Checks for a newer turbo version and opens a PR to update the package
+  using @turbo/codemod, which migrates turbo.json and other config files.
+inputs:
+  github-token:
+    description: >
+      GitHub token with contents:write and pull-requests:write permissions.
+      Pass secrets.GITHUB_TOKEN from the calling workflow.
+    required: true
+  reviewers:
+    description: Comma or newline separated list of pull request reviewers.
+    required: false
+    default: ''
+  assignees:
+    description: Comma or newline separated list of pull request assignees.
+    required: false
+    default: ''
+  labels:
+    description: Labels to apply to the pull request.
+    required: false
+    default: build
+runs:
+  using: composite
+  steps:
+    - name: Get current turbo version
+      id: current
+      shell: bash
+      run: |
+        CURRENT_VERSION=$(node -p "const pkg = require('./package.json'); const v = pkg.devDependencies?.turbo || pkg.dependencies?.turbo || ''; v.replace(/^[\\^~>=]+/, '')")
+        echo "Current turbo version: $CURRENT_VERSION"
+        echo "version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+
+    - name: Get latest turbo version
+      id: latest
+      shell: bash
+      run: |
+        LATEST_VERSION=$(npm view turbo version)
+        echo "Latest turbo version: $LATEST_VERSION"
+        echo "version=$LATEST_VERSION" >> "$GITHUB_OUTPUT"
+
+    - name: Determine bump type
+      if: steps.latest.outputs.version != steps.current.outputs.version
+      id: bump
+      shell: bash
+      env:
+        CURRENT: ${{ steps.current.outputs.version }}
+        LATEST: ${{ steps.latest.outputs.version }}
+      run: |
+        IFS='.' read -r CUR_MAJOR CUR_MINOR _ <<< "$CURRENT"
+        IFS='.' read -r LAT_MAJOR LAT_MINOR _ <<< "$LATEST"
+        if [ "$CUR_MAJOR" != "$LAT_MAJOR" ]; then
+          echo "type=major" >> "$GITHUB_OUTPUT"
+        elif [ "$CUR_MINOR" != "$LAT_MINOR" ]; then
+          echo "type=minor" >> "$GITHUB_OUTPUT"
+        else
+          echo "type=patch" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Set up Node.js
+      if: steps.latest.outputs.version != steps.current.outputs.version
+      uses: actions/setup-node@v6
+      with:
+        node-version: lts/*
+
+    - name: Install pnpm
+      if: steps.latest.outputs.version != steps.current.outputs.version
+      uses: pnpm/action-setup@v6
+
+    - name: Run turbo codemod update
+      if: steps.latest.outputs.version != steps.current.outputs.version
+      shell: bash
+      run: pnpm dlx @turbo/codemod@latest update
+
+    - name: Regenerate lockfile
+      if: steps.latest.outputs.version != steps.current.outputs.version
+      shell: bash
+      run: pnpm install --no-frozen-lockfile --ignore-scripts
+
+    - name: Build PR body
+      if: steps.latest.outputs.version != steps.current.outputs.version
+      id: pr-body
+      shell: bash
+      env:
+        CURRENT: ${{ steps.current.outputs.version }}
+        LATEST: ${{ steps.latest.outputs.version }}
+        BUMP: ${{ steps.bump.outputs.type }}
+      run: |
+        BODY="## turbo upgrade: \`$CURRENT\` → \`$LATEST\` ($BUMP)
+
+        ### Links
+
+        - 📋 [Changelog](https://github.com/vercel/turborepo/blob/main/packages/turbo/CHANGELOG.md)
+        - 🏷️ [Release notes for v$LATEST](https://github.com/vercel/turborepo/releases/tag/v$LATEST)
+        - 📦 [npm package](https://www.npmjs.com/package/turbo/v/$LATEST)"
+
+        if [ "$BUMP" = "major" ]; then
+          BODY="$BODY
+
+        ### ⚠️ Breaking changes
+
+        This is a **major version** upgrade. Please review the [release notes](https://github.com/vercel/turborepo/releases/tag/v$LATEST) carefully for breaking changes.
+
+        Major version upgrades may require updates to:
+        - \`turbo.json\` schema (the codemod has already applied automated migrations)
+        - Task pipeline configuration and \`dependsOn\` syntax
+        - Remote cache configuration
+        - CI/CD environment variables (e.g. \`TURBO_TOKEN\`, \`TURBO_TEAM\`)"
+        fi
+
+        {
+          echo "body<<EOF"
+          echo "$BODY"
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Create pull request
+      if: steps.latest.outputs.version != steps.current.outputs.version
+      id: create-pr
+      uses: peter-evans/create-pull-request@v8
+      with:
+        token: ${{ inputs.github-token }}
+        commit-message: 'build: update turbo ${{ steps.current.outputs.version }} → ${{ steps.latest.outputs.version }} (${{ steps.bump.outputs.type }})'
+        title: 'build: update turbo ${{ steps.current.outputs.version }} → ${{ steps.latest.outputs.version }} (${{ steps.bump.outputs.type }})'
+        body: ${{ steps.pr-body.outputs.body }}
+        branch: update-turbo-${{ steps.latest.outputs.version }}
+        labels: ${{ inputs.labels }}
+        reviewers: ${{ inputs.reviewers }}
+        assignees: ${{ inputs.assignees }}
+
+    - name: Ask Copilot to review major upgrades
+      if: steps.latest.outputs.version != steps.current.outputs.version && steps.bump.outputs.type == 'major'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        CURRENT: ${{ steps.current.outputs.version }}
+        LATEST: ${{ steps.latest.outputs.version }}
+        PR_NUMBER: ${{ steps.create-pr.outputs.pull-request-number }}
+      run: |
+        gh pr comment "$PR_NUMBER" --body "@copilot This is a **major version** upgrade of turbo ($CURRENT → $LATEST). Please review the [release notes](https://github.com/vercel/turborepo/releases/tag/v$LATEST) and check whether any files in this repository need updating due to breaking changes — for example \`turbo.json\` schema changes, task pipeline configuration, remote cache settings, or CI/CD environment variables."
