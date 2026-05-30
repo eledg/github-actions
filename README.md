@@ -10,11 +10,13 @@ Installs Node.js 24, pnpm, restores the pnpm store cache, caches the Turborepo l
 
 ```yaml
 - uses: eledg/github-actions/setup-pnpm@v1
+  with:
+    enable-turbo-cache: 'true' # enable for jobs that run turbo tasks
 ```
 
 | Input                | Required | Default | Description                                                                                       |
 | -------------------- | -------- | ------- | ------------------------------------------------------------------------------------------------- |
-| `enable-turbo-cache` | No       | `true`  | Cache the `.turbo` directory between runs. Set to `'false'` for jobs that do not run turbo tasks. |
+| `enable-turbo-cache` | No       | `false` | Cache the `.turbo` directory between runs. Set to `'true'` for jobs that run turbo tasks.         |
 
 ---
 
