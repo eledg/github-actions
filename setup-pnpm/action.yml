@@ -27,9 +27,9 @@ runs:
       name: Setup turbo cache
       if: inputs.enable-turbo-cache == 'true'
       with:
-        path: .turbo
+        path: .turbo/cache
         key: ${{ runner.os }}-turbo-${{ github.sha }}
         restore-keys: |
           ${{ runner.os }}-turbo-
-    - run: pnpm install
+    - run: pnpm install --frozen-lockfile
       shell: bash
