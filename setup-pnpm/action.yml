@@ -4,7 +4,7 @@ inputs:
   enable-turbo-cache:
     description: Cache the .turbo directory between runs. Set to 'false' for jobs that do not run turbo tasks.
     required: false
-    default: 'true'
+    default: 'false'
 runs:
   using: composite
   steps:
