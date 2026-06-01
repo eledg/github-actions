@@ -84,18 +84,20 @@ Outputs a boolean indicating whether any of the specified paths were modified in
 
 ### `cdk-synth`
 
-Assumes an AWS IAM role via OIDC and runs `pnpm --filter infra synth`. Any app-specific environment variables (e.g. secrets passed to the CDK app) should be set at the calling job level.
+Assumes an AWS IAM role via OIDC and runs `pnpm --filter infra synth -- -c envName=<env-name>`. Any app-specific environment variables (e.g. secrets passed to the CDK app) should be set at the calling job level.
 
 ```yaml
 - uses: eledg/github-actions/cdk-synth@v1
   with:
     role-to-assume: arn:aws:iam::123456789012:role/GitHubActionsOIDCRole-eu-west-1
+    env-name: staging
 ```
 
-| Input            | Required | Default     | Description                     |
-| ---------------- | -------- | ----------- | ------------------------------- |
-| `role-to-assume` | Yes      | —           | IAM role ARN to assume via OIDC |
-| `aws-region`     | No       | `eu-west-1` | AWS region                      |
+| Input            | Required | Default     | Description                                                        |
+| ---------------- | -------- | ----------- | ------------------------------------------------------------------ |
+| `role-to-assume` | Yes      | —           | IAM role ARN to assume via OIDC                                    |
+| `env-name`       | Yes      | —           | CDK `envName` context value (`staging`, `prod`, `preview`, `pr-N`) |
+| `aws-region`     | No       | `eu-west-1` | AWS region                                                         |
 
 Requires `id-token: write` permission on the calling job.
 
@@ -103,18 +105,20 @@ Requires `id-token: write` permission on the calling job.
 
 ### `cdk-diff`
 
-Assumes an AWS IAM role via OIDC and runs `pnpm --filter infra prod:diff`. On pull requests, posts the diff as a comment. Any app-specific environment variables should be set at the calling job level.
+Assumes an AWS IAM role via OIDC and runs `pnpm --filter infra diff -- -c envName=<env-name>`. On pull requests, posts the diff as a comment. Any app-specific environment variables should be set at the calling job level.
 
 ```yaml
 - uses: eledg/github-actions/cdk-diff@v1
   with:
     role-to-assume: arn:aws:iam::123456789012:role/GitHubActionsOIDCRole-eu-west-1
+    env-name: prod
 ```
 
-| Input            | Required | Default     | Description                     |
-| ---------------- | -------- | ----------- | ------------------------------- |
-| `role-to-assume` | Yes      | —           | IAM role ARN to assume via OIDC |
-| `aws-region`     | No       | `eu-west-1` | AWS region                      |
+| Input            | Required | Default     | Description                                                        |
+| ---------------- | -------- | ----------- | ------------------------------------------------------------------ |
+| `role-to-assume` | Yes      | —           | IAM role ARN to assume via OIDC                                    |
+| `env-name`       | Yes      | —           | CDK `envName` context value (`staging`, `prod`, `preview`, `pr-N`) |
+| `aws-region`     | No       | `eu-west-1` | AWS region                                                         |
 
 Requires `id-token: write` and `pull-requests: write` permissions on the calling job.
 
