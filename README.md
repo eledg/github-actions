@@ -84,20 +84,24 @@ Outputs a boolean indicating whether any of the specified paths were modified in
 
 ### `cdk-synth`
 
-Assumes an AWS IAM role via OIDC and runs `pnpm --filter infra synth -- -c envName=<env-name>`. Any app-specific environment variables (e.g. secrets passed to the CDK app) should be set at the calling job level.
+Assumes an AWS IAM role via OIDC and runs `pnpm --filter <filter> synth -- -c <context-key>=<env-name>`. Any app-specific environment variables (e.g. secrets passed to the CDK app) should be set at the calling job level.
 
 ```yaml
 - uses: eledg/github-actions/cdk-synth@v1
   with:
     role-to-assume: arn:aws:iam::123456789012:role/GitHubActionsOIDCRole-eu-west-1
     env-name: staging
+    # filter: cdk        # override if your CDK workspace is not named 'infra'
+    # context-key: env   # override if your CDK app uses a different context key
 ```
 
 | Input            | Required | Default     | Description                                                        |
 | ---------------- | -------- | ----------- | ------------------------------------------------------------------ |
 | `role-to-assume` | Yes      | —           | IAM role ARN to assume via OIDC                                    |
-| `env-name`       | Yes      | —           | CDK `envName` context value (`staging`, `prod`, `preview`, `pr-N`) |
+| `env-name`       | Yes      | —           | CDK context value passed as `-c <context-key>=<env-name>`          |
 | `aws-region`     | No       | `eu-west-1` | AWS region                                                         |
+| `filter`         | No       | `infra`     | pnpm workspace filter for the CDK app                              |
+| `context-key`    | No       | `envName`   | CDK context key passed via `-c KEY=value`                          |
 
 Requires `id-token: write` permission on the calling job.
 
@@ -105,20 +109,24 @@ Requires `id-token: write` permission on the calling job.
 
 ### `cdk-diff`
 
-Assumes an AWS IAM role via OIDC and runs `pnpm --filter infra diff -- -c envName=<env-name>`. On pull requests, posts the diff as a comment. Any app-specific environment variables should be set at the calling job level.
+Assumes an AWS IAM role via OIDC and runs `pnpm --filter <filter> diff -- -c <context-key>=<env-name>`. On pull requests, posts the diff as a comment. Any app-specific environment variables should be set at the calling job level.
 
 ```yaml
 - uses: eledg/github-actions/cdk-diff@v1
   with:
     role-to-assume: arn:aws:iam::123456789012:role/GitHubActionsOIDCRole-eu-west-1
     env-name: prod
+    # filter: cdk        # override if your CDK workspace is not named 'infra'
+    # context-key: env   # override if your CDK app uses a different context key
 ```
 
 | Input            | Required | Default     | Description                                                        |
 | ---------------- | -------- | ----------- | ------------------------------------------------------------------ |
 | `role-to-assume` | Yes      | —           | IAM role ARN to assume via OIDC                                    |
-| `env-name`       | Yes      | —           | CDK `envName` context value (`staging`, `prod`, `preview`, `pr-N`) |
+| `env-name`       | Yes      | —           | CDK context value passed as `-c <context-key>=<env-name>`          |
 | `aws-region`     | No       | `eu-west-1` | AWS region                                                         |
+| `filter`         | No       | `infra`     | pnpm workspace filter for the CDK app                              |
+| `context-key`    | No       | `envName`   | CDK context key passed via `-c KEY=value`                          |
 
 Requires `id-token: write` and `pull-requests: write` permissions on the calling job.
 

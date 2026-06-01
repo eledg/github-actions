@@ -11,6 +11,14 @@ inputs:
     description: AWS region
     required: false
     default: eu-west-1
+  filter:
+    description: pnpm workspace filter for the CDK app
+    required: false
+    default: infra
+  context-key:
+    description: CDK context key passed via -c KEY=value
+    required: false
+    default: envName
 outputs:
   comment-id:
     description: ID of the created/updated comment
@@ -25,11 +33,11 @@ runs:
         aws-region: ${{ inputs.aws-region }}
     - name: Run CDK Diff
       if: ${{ github.event_name != 'pull_request' }}
-      run: pnpm --filter infra diff -- -c envName=${{ inputs.env-name }}
+      run: pnpm --filter ${{ inputs.filter }} diff -- -c ${{ inputs.context-key }}=${{ inputs.env-name }}
       shell: bash
     - name: Run CDK Diff (PR)
       if: ${{ github.event_name == 'pull_request' }}
-      run: pnpm --filter infra diff -- -c envName=${{ inputs.env-name }} > cdk-diff.txt || true
+      run: pnpm --filter ${{ inputs.filter }} diff -- -c ${{ inputs.context-key }}=${{ inputs.env-name }} > cdk-diff.txt || true
       shell: bash
     - name: Comment on PR
       id: comment
