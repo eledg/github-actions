@@ -33,11 +33,11 @@ runs:
         aws-region: ${{ inputs.aws-region }}
     - name: Run CDK Diff
       if: ${{ github.event_name != 'pull_request' }}
-      run: pnpm --filter ${{ inputs.filter }} exec -- cdk diff -c ${{ inputs.context-key }}=${{ inputs.env-name }}
+      run: pnpm --filter ${{ inputs.filter }} exec cdk diff -c ${{ inputs.context-key }}=${{ inputs.env-name }}
       shell: bash
     - name: Run CDK Diff (PR)
       if: ${{ github.event_name == 'pull_request' }}
-      run: pnpm --filter ${{ inputs.filter }} exec -- cdk diff -c ${{ inputs.context-key }}=${{ inputs.env-name }} > cdk-diff.txt || true
+      run: pnpm --filter ${{ inputs.filter }} exec cdk diff -c ${{ inputs.context-key }}=${{ inputs.env-name }} > cdk-diff.txt || true
       shell: bash
     - name: Comment on PR
       id: comment
