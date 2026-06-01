@@ -11,12 +11,12 @@ Installs Node.js 24, pnpm, restores the pnpm store cache, caches the Turborepo l
 ```yaml
 - uses: eledg/github-actions/setup-pnpm@v1
   with:
-    enable-turbo-cache: 'true' # enable for jobs that run turbo tasks
+    enable-turbo-cache: "true" # enable for jobs that run turbo tasks
 ```
 
-| Input                | Required | Default | Description                                                                                       |
-| -------------------- | -------- | ------- | ------------------------------------------------------------------------------------------------- |
-| `enable-turbo-cache` | No       | `false` | Cache the `.turbo` directory between runs. Set to `'true'` for jobs that run turbo tasks.         |
+| Input                | Required | Default | Description                                                                               |
+| -------------------- | -------- | ------- | ----------------------------------------------------------------------------------------- |
+| `enable-turbo-cache` | No       | `false` | Cache the `.turbo` directory between runs. Set to `'true'` for jobs that run turbo tasks. |
 
 ---
 
@@ -95,13 +95,13 @@ Assumes an AWS IAM role via OIDC and runs `pnpm --filter <filter> synth -- -c <c
     # context-key: env   # override if your CDK app uses a different context key
 ```
 
-| Input            | Required | Default     | Description                                                        |
-| ---------------- | -------- | ----------- | ------------------------------------------------------------------ |
-| `role-to-assume` | Yes      | —           | IAM role ARN to assume via OIDC                                    |
-| `env-name`       | Yes      | —           | CDK context value passed as `-c <context-key>=<env-name>`          |
-| `aws-region`     | No       | `eu-west-1` | AWS region                                                         |
-| `filter`         | No       | `infra`     | pnpm workspace filter for the CDK app                              |
-| `context-key`    | No       | `envName`   | CDK context key passed via `-c KEY=value`                          |
+| Input            | Required | Default     | Description                                               |
+| ---------------- | -------- | ----------- | --------------------------------------------------------- |
+| `role-to-assume` | Yes      | —           | IAM role ARN to assume via OIDC                           |
+| `env-name`       | Yes      | —           | CDK context value passed as `-c <context-key>=<env-name>` |
+| `aws-region`     | No       | `eu-west-1` | AWS region                                                |
+| `filter`         | No       | `infra`     | pnpm workspace filter for the CDK app                     |
+| `context-key`    | No       | `envName`   | CDK context key passed via `-c KEY=value`                 |
 
 Requires `id-token: write` permission on the calling job.
 
@@ -120,13 +120,13 @@ Assumes an AWS IAM role via OIDC and runs `pnpm --filter <filter> diff -- -c <co
     # context-key: env   # override if your CDK app uses a different context key
 ```
 
-| Input            | Required | Default     | Description                                                        |
-| ---------------- | -------- | ----------- | ------------------------------------------------------------------ |
-| `role-to-assume` | Yes      | —           | IAM role ARN to assume via OIDC                                    |
-| `env-name`       | Yes      | —           | CDK context value passed as `-c <context-key>=<env-name>`          |
-| `aws-region`     | No       | `eu-west-1` | AWS region                                                         |
-| `filter`         | No       | `infra`     | pnpm workspace filter for the CDK app                              |
-| `context-key`    | No       | `envName`   | CDK context key passed via `-c KEY=value`                          |
+| Input            | Required | Default     | Description                                               |
+| ---------------- | -------- | ----------- | --------------------------------------------------------- |
+| `role-to-assume` | Yes      | —           | IAM role ARN to assume via OIDC                           |
+| `env-name`       | Yes      | —           | CDK context value passed as `-c <context-key>=<env-name>` |
+| `aws-region`     | No       | `eu-west-1` | AWS region                                                |
+| `filter`         | No       | `infra`     | pnpm workspace filter for the CDK app                     |
+| `context-key`    | No       | `envName`   | CDK context key passed via `-c KEY=value`                 |
 
 Requires `id-token: write` and `pull-requests: write` permissions on the calling job.
 
