@@ -4,6 +4,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    reviewers:
+      - eledg
+    assignees:
+      - eledg
     groups:
       actions:
         patterns:
