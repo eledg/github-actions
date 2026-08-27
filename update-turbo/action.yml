@@ -70,7 +70,7 @@ runs:
     - name: Run turbo codemod update
       if: steps.latest.outputs.version != steps.current.outputs.version
       shell: bash
-      run: pnpm dlx @turbo/codemod@latest update
+      run: pnpm dlx @turbo/codemod@latest update .
 
     - name: Regenerate lockfile
       if: steps.latest.outputs.version != steps.current.outputs.version
