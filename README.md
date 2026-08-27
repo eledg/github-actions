@@ -204,8 +204,13 @@ Requires `contents: write` and `pull-requests: write` permissions on the calling
 
 Checks for a newer turbo version on npm and opens a PR to update using `@turbo/codemod`, which migrates `turbo.json` and other config files automatically. No-ops if already on the latest version.
 
+Requires dependencies to already be installed — run [`setup-pnpm`](#setup-pnpm) before this action. `@turbo/codemod` detects the current turbo version by shelling out to `pnpm turbo --version`; without `node_modules` already present, that triggers pnpm's auto-install-on-run behavior, which prints install progress noise to stdout that the codemod mistakes for the version string and crashes on.
+
 ```yaml
-- uses: actions/checkout@v6
+- uses: actions/checkout@v7
+- uses: eledg/github-actions/setup-pnpm@v1
+  with:
+    enable-turbo-cache: "true"
 - uses: eledg/github-actions/update-turbo@v1
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
