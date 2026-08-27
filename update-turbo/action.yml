@@ -67,6 +67,11 @@ runs:
       if: steps.latest.outputs.version != steps.current.outputs.version
       uses: pnpm/action-setup@v6
 
+    - name: Install dependencies
+      if: steps.latest.outputs.version != steps.current.outputs.version
+      shell: bash
+      run: pnpm install --frozen-lockfile --ignore-scripts
+
     - name: Run turbo codemod update
       if: steps.latest.outputs.version != steps.current.outputs.version
       shell: bash
