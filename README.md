@@ -63,7 +63,7 @@ Runs `pnpm coverage` and uploads results to Codecov.
 Outputs a boolean indicating whether any of the specified paths were modified in the current push or PR. Requires the repo to be checked out with `fetch-depth: 0`.
 
 ```yaml
-- uses: actions/checkout@v4
+- uses: actions/checkout@v7
   with:
     fetch-depth: 0
 - id: set-result
@@ -154,7 +154,7 @@ jobs:
   update-dependencies:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v7
       - uses: eledg/github-actions/check-action-dependencies@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -173,7 +173,7 @@ Requires `contents: write` and `pull-requests: write` permissions on the calling
 Checks for a newer pnpm version on npm and opens a PR to update the `packageManager` field in `package.json` and regenerate the lockfile. No-ops if already on the latest version.
 
 ```yaml
-- uses: actions/checkout@v6
+- uses: actions/checkout@v7
 - uses: eledg/github-actions/update-pnpm@v1
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
