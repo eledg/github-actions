@@ -1,0 +1,33 @@
+name: Dependabot major version review
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  review-major-bump:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      # Deliberately no `ref:` — on pull_request_target this checks out the
+      # base branch, not the PR head, since we never build or run PR code.
+      - uses: actions/checkout@v7
+
+      - name: Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Ask Claude to review major upgrade
+        if: steps.metadata.outputs.update-type == 'version-update:semver-major'
+        uses: ./review-major-upgrade
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pr-number: ${{ github.event.pull_request.number }}
+          dependency-name: ${{ steps.metadata.outputs.dependency-names }}
+          previous-version: ${{ steps.metadata.outputs.previous-version }}
+          new-version: ${{ steps.metadata.outputs.new-version }}

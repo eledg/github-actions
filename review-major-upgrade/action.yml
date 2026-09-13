@@ -1,0 +1,94 @@
+name: Review major upgrade
+description: >
+  Posts a comment asking Claude to review a major-version dependency bump:
+  check compatibility, make safe fixes, and reply with a structured summary.
+inputs:
+  github-token:
+    description: >
+      GitHub token with pull-requests:write permission, used to post the
+      comment. Pass secrets.GITHUB_TOKEN from the calling workflow.
+    required: true
+  pr-number:
+    description: Pull request number to comment on.
+    required: true
+  dependency-name:
+    description: >
+      Name of the dependency being bumped. Comma-separated for grouped
+      updates.
+    required: true
+  previous-version:
+    description: Current version.
+    required: true
+  new-version:
+    description: New (major-bumped) version.
+    required: true
+  release-notes-url:
+    description: >
+      Direct link to the changelog/release notes, if known. If omitted,
+      Claude is asked to find them itself.
+    required: false
+    default: ""
+  hints:
+    description: >
+      Freeform extra context appended to the prompt, e.g. specific files or
+      config likely affected by the bump. One bullet point per line.
+    required: false
+    default: ""
+runs:
+  using: composite
+  steps:
+    - name: Ask Claude to review major upgrade
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+        DEPENDENCY: ${{ inputs.dependency-name }}
+        PREVIOUS: ${{ inputs.previous-version }}
+        NEW: ${{ inputs.new-version }}
+        RELEASE_NOTES_URL: ${{ inputs.release-notes-url }}
+        HINTS: ${{ inputs.hints }}
+      run: |
+        RELEASE_NOTES_PHRASE=""
+        if [ -n "$RELEASE_NOTES_URL" ]; then
+          RELEASE_NOTES_PHRASE=" ($RELEASE_NOTES_URL)"
+        fi
+
+        BODY="@claude This pull request is a **major version** upgrade: \`$DEPENDENCY\` \`$PREVIOUS\` → \`$NEW\`.
+
+        Please review it for breaking changes and act as follows:
+
+        1. **Research** — Read the changelog/release notes for \`$DEPENDENCY\` covering every version between \`$PREVIOUS\` (exclusive) and \`$NEW\` (inclusive)$RELEASE_NOTES_PHRASE. Focus on removed/renamed APIs, changed defaults, config schema changes, and new peer-dependency or runtime requirements.
+
+        2. **Assess** — Check this repository's actual usage of \`$DEPENDENCY\` (config files, imports, CI workflows, related tooling) against those breaking changes, and whether any other dependency here is incompatible with the new major version."
+
+        if [ -n "$HINTS" ]; then
+          BODY="$BODY
+
+        Specifically check:
+        $HINTS"
+        fi
+
+        BODY="$BODY
+
+        3. **Fix, if safe** — If a breaking change requires an update and the fix is unambiguous (a documented codemod, a renamed config key, an updated import path), make the change directly on this PR branch and commit it. Don't touch unrelated files, don't upgrade other dependencies, and don't change behavior beyond what compatibility requires.
+
+        4. **Escalate, if unsafe** — If a fix needs a judgment call (ambiguous migration path, a behavior change with product implications, no test coverage to verify correctness), don't guess — leave it and say so explicitly.
+
+        5. **Reply** — Post a single summary comment on this PR with exactly this structure:
+
+        ## Major upgrade review: \`$DEPENDENCY\` $PREVIOUS → $NEW
+
+        **Verdict:** ✅ Compatible as-is / 🔧 Compatible, changes applied / ⚠️ Needs manual follow-up / ❌ Not compatible
+
+        ### What changed upstream
+        - (breaking changes relevant to this repo's usage, or \"None found relevant to this repo's usage\")
+
+        ### Changes made
+        - (files changed and why, or \"None needed\")
+
+        ### Follow-up needed
+        - (anything a human must still check or decide, or \"None\")
+
+        Keep it concise — a human is deciding whether to merge based on this comment."
+
+        gh pr comment "$PR_NUMBER" --body "$BODY"
