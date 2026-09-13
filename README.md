@@ -200,6 +200,39 @@ Requires `contents: write` and `pull-requests: write` permissions on the calling
 
 ---
 
+### `review-major-upgrade`
+
+Posts a comment asking Claude to review a major-version dependency bump: check compatibility with the repo (and its other dependencies), make safe fixes directly on the PR branch, and reply with a structured summary. Used internally by [`update-turbo`](#update-turbo) and [`update-pnpm`](#update-pnpm), and by the [Dependabot major version review](#dependabot-major-version-review) workflow below — it can also be called directly from any workflow that opens or reacts to a major-version-bump PR.
+
+Requires the [Claude GitHub App](https://github.com/apps/claude) to be installed on the repository so that `@claude` mentions are picked up.
+
+```yaml
+- uses: eledg/github-actions/review-major-upgrade@v1
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    pr-number: ${{ steps.create-pr.outputs.pull-request-number }}
+    dependency-name: some-package
+    previous-version: "3.4.0"
+    new-version: "4.0.0"
+    # release-notes-url: https://github.com/owner/some-package/releases/tag/v4.0.0
+    # hints: |
+    #   - Specific config file or API this dependency's major bumps tend to affect
+```
+
+| Input                | Required | Default | Description                                                                      |
+| --------------------- | -------- | ------- | --------------------------------------------------------------------------------- |
+| `github-token`        | Yes      | —       | GitHub token with `pull-requests: write`, used to post the comment                |
+| `pr-number`           | Yes      | —       | Pull request number to comment on                                                 |
+| `dependency-name`     | Yes      | —       | Name of the dependency being bumped (comma-separated for grouped updates)         |
+| `previous-version`    | Yes      | —       | Current version                                                                    |
+| `new-version`         | Yes      | —       | New (major-bumped) version                                                         |
+| `release-notes-url`   | No       | `''`    | Direct link to the changelog/release notes. If omitted, Claude looks them up itself |
+| `hints`               | No       | `''`    | Freeform extra context appended to the prompt, one bullet point per line          |
+
+Requires `pull-requests: write` permission on the calling workflow.
+
+---
+
 ### `update-turbo`
 
 Checks for a newer turbo version on npm and opens a PR to update using `@turbo/codemod`, which migrates `turbo.json` and other config files automatically. No-ops if already on the latest version.
@@ -249,6 +282,50 @@ No inputs.
 
 ---
 
+### Dependabot major version review
+
+Add a workflow to any repo that uses Dependabot, so that a major-version-bump PR gets an `@claude` comment asking it to check compatibility and fix what it safely can. Uses [`review-major-upgrade`](#review-major-upgrade) under the hood.
+
+This must trigger on `pull_request_target`, not `pull_request`: GitHub always gives `pull_request`-triggered workflows a **read-only** token with no secrets when the PR author is Dependabot, regardless of the `permissions:` block, so a plain `pull_request` workflow can't post a comment. `pull_request_target` runs with the base repo's normal permissions instead. This is safe here because the workflow never checks out or runs the PR's code — it only reads event metadata and calls the GitHub API.
+
+```yaml
+name: Dependabot major version review
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  review-major-bump:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Ask Claude to review major upgrade
+        if: steps.metadata.outputs.update-type == 'version-update:semver-major'
+        uses: eledg/github-actions/review-major-upgrade@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pr-number: ${{ github.event.pull_request.number }}
+          dependency-name: ${{ steps.metadata.outputs.dependency-names }}
+          previous-version: ${{ steps.metadata.outputs.previous-version }}
+          new-version: ${{ steps.metadata.outputs.new-version }}
+```
+
+[`dependabot/fetch-metadata`](https://github.com/dependabot/fetch-metadata) is GitHub's own action for reading Dependabot PR metadata (dependency name, versions, and `update-type`) without parsing the PR title. For grouped updates it reports the highest-severity update type across the group, and the dependency/version outputs may cover more than one package — Claude is told to check the actual PR diff and changelogs itself rather than relying solely on these inputs.
+
+Requires `pull-requests: write` permission on the calling workflow, and the [Claude GitHub App](https://github.com/apps/claude) installed on the repository.
+
+---
+
 ## Versioning
 
 Consuming repos pin to a major version tag (e.g. `@v1`). Dependabot in each consuming repo will open PRs when a new version is published here.
@@ -268,3 +345,5 @@ git push origin v1 --force
 Upstream actions referenced in `.github/workflows/` are kept up to date by Dependabot (configured in `.github/dependabot.yml`), which runs weekly and groups all updates into a single PR.
 
 Upstream actions referenced inside composite `action.yml` files are kept up to date by the `check-action-dependencies` workflow in this repo, which runs every Friday and opens a PR with any major-version bumps. Consuming repos can use the `check-action-dependencies` action to get the same coverage for their own composite actions.
+
+Once Dependabot (or `check-action-dependencies`) opens a major-version-bump PR, consuming repos can add the [Dependabot major version review](#dependabot-major-version-review) workflow to have Claude check compatibility and fix what it safely can before a human reviews it.

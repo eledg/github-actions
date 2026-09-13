@@ -156,13 +156,20 @@ runs:
         reviewers: ${{ inputs.reviewers }}
         assignees: ${{ inputs.assignees }}
 
-    - name: Ask Claude to review major upgrades
+    - name: Ask Claude to review major upgrade
       if: steps.latest.outputs.version != steps.current.outputs.version && steps.bump.outputs.type == 'major'
-      shell: bash
-      env:
-        GH_TOKEN: ${{ inputs.github-token }}
-        CURRENT: ${{ steps.current.outputs.version }}
-        LATEST: ${{ steps.latest.outputs.version }}
-        PR_NUMBER: ${{ steps.create-pr.outputs.pull-request-number }}
-      run: |
-        gh pr comment "$PR_NUMBER" --body "@claude This is a **major version** upgrade of pnpm ($CURRENT → $LATEST). Please review the [release notes](https://github.com/pnpm/pnpm/releases/tag/v$LATEST) and check whether any files in this repository need updating due to breaking changes — for example \`pnpm-lock.yaml\` format, \`.npmrc\` options, \`pnpm-workspace.yaml\`, CI workflows, or Node.js version requirements."
+      uses: eledg/github-actions/review-major-upgrade@v1
+      with:
+        github-token: ${{ inputs.github-token }}
+        pr-number: ${{ steps.create-pr.outputs.pull-request-number }}
+        dependency-name: pnpm
+        previous-version: ${{ steps.current.outputs.version }}
+        new-version: ${{ steps.latest.outputs.version }}
+        release-notes-url: https://github.com/pnpm/pnpm/releases/tag/v${{ steps.latest.outputs.version }}
+        hints: |
+          - `pnpm-lock.yaml` format
+          - `.npmrc` configuration options
+          - CI/CD workflows and scripts
+          - Node.js version requirements
+          - Workspace configuration (`pnpm-workspace.yaml`)
+          - Lifecycle script behaviour
