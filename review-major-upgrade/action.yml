@@ -41,6 +41,12 @@ runs:
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github-token }}
+        # gh infers the target repo from the git remote in cwd when this
+        # isn't set. Callers that (correctly) skip actions/checkout — e.g.
+        # a pull_request_target workflow that never needs PR code — have no
+        # .git directory, so gh fails with "not a git repository" unless we
+        # tell it explicitly.
+        GH_REPO: ${{ github.repository }}
         PR_NUMBER: ${{ inputs.pr-number }}
         DEPENDENCY: ${{ inputs.dependency-name }}
         PREVIOUS: ${{ inputs.previous-version }}
