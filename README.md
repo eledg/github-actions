@@ -206,6 +206,8 @@ Posts a comment asking Claude to review a major-version dependency bump: check c
 
 Requires the [Claude GitHub App](https://github.com/apps/claude) to be installed on the repository so that `@claude` mentions are picked up.
 
+`dependabot/fetch-metadata`'s `previous-version`/`new-version` outputs come back **blank**, not just imprecise, whenever a PR groups more than one package together — even when the group's overall `update-type` is major. Pass `pr-body` in that case: Dependabot always renders a structured per-package version table into the PR body it generates, regardless of grouping, and it's included as optional additional context Claude can fall back on.
+
 ```yaml
 - uses: eledg/github-actions/review-major-upgrade@v1
   with:
@@ -214,6 +216,7 @@ Requires the [Claude GitHub App](https://github.com/apps/claude) to be installed
     dependency-name: some-package
     previous-version: "3.4.0"
     new-version: "4.0.0"
+    # pr-body: ${{ github.event.pull_request.body }}  # fallback for grouped updates
     # release-notes-url: https://github.com/owner/some-package/releases/tag/v4.0.0
     # hints: |
     #   - Specific config file or API this dependency's major bumps tend to affect
@@ -224,8 +227,9 @@ Requires the [Claude GitHub App](https://github.com/apps/claude) to be installed
 | `github-token`        | Yes      | —       | GitHub token with `pull-requests: write`, used to post the comment                |
 | `pr-number`           | Yes      | —       | Pull request number to comment on                                                 |
 | `dependency-name`     | Yes      | —       | Name of the dependency being bumped (comma-separated for grouped updates)         |
-| `previous-version`    | Yes      | —       | Current version                                                                    |
-| `new-version`         | Yes      | —       | New (major-bumped) version                                                         |
+| `previous-version`    | No       | `''`    | Current version, if known precisely. Often blank for grouped updates              |
+| `new-version`         | No       | `''`    | New (major-bumped) version, if known precisely. Same caveat as `previous-version` |
+| `pr-body`             | No       | `''`    | Full PR body. Optional fallback so Claude can source exact versions when the scalar inputs are blank or only cover one package in a group |
 | `release-notes-url`   | No       | `''`    | Direct link to the changelog/release notes. If omitted, Claude looks them up itself |
 | `hints`               | No       | `''`    | Freeform extra context appended to the prompt, one bullet point per line          |
 
@@ -318,9 +322,10 @@ jobs:
           dependency-name: ${{ steps.metadata.outputs.dependency-names }}
           previous-version: ${{ steps.metadata.outputs.previous-version }}
           new-version: ${{ steps.metadata.outputs.new-version }}
+          pr-body: ${{ github.event.pull_request.body }}
 ```
 
-[`dependabot/fetch-metadata`](https://github.com/dependabot/fetch-metadata) is GitHub's own action for reading Dependabot PR metadata (dependency name, versions, and `update-type`) without parsing the PR title. For grouped updates it reports the highest-severity update type across the group, and the dependency/version outputs may cover more than one package — Claude is told to check the actual PR diff and changelogs itself rather than relying solely on these inputs.
+[`dependabot/fetch-metadata`](https://github.com/dependabot/fetch-metadata) is GitHub's own action for reading Dependabot PR metadata (dependency name, versions, and `update-type`) without parsing the PR title. For grouped updates it reports the highest-severity update type across the group, but its `previous-version`/`new-version` outputs come back blank — `pr-body` is passed through so Claude can fall back on Dependabot's own per-package version table in the PR description.
 
 Requires `pull-requests: write` permission on the calling workflow, and the [Claude GitHub App](https://github.com/apps/claude) installed on the repository.
 
