@@ -31,3 +31,4 @@ jobs:
           dependency-name: ${{ steps.metadata.outputs.dependency-names }}
           previous-version: ${{ steps.metadata.outputs.previous-version }}
           new-version: ${{ steps.metadata.outputs.new-version }}
+          pr-body: ${{ github.event.pull_request.body }}

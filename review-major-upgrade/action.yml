@@ -17,11 +17,26 @@ inputs:
       updates.
     required: true
   previous-version:
-    description: Current version.
-    required: true
+    description: >
+      Current version, if known precisely. Optional — dependabot/fetch-metadata
+      leaves this blank for grouped updates covering more than one package,
+      even when the group's overall update-type is major. Pass pr-body as a
+      fallback in that case.
+    required: false
+    default: ""
   new-version:
-    description: New (major-bumped) version.
-    required: true
+    description: New (major-bumped) version, if known precisely. Same caveat as previous-version.
+    required: false
+    default: ""
+  pr-body:
+    description: >
+      Full PR body/description — pass the pull_request event's body. Optional
+      additional context: Dependabot always renders a structured per-package
+      version table here, even for grouped updates, so it's useful when
+      previous-version/new-version are blank or only cover one package in a
+      multi-package bump.
+    required: false
+    default: ""
   release-notes-url:
     description: >
       Direct link to the changelog/release notes, if known. If omitted,
@@ -51,6 +66,7 @@ runs:
         DEPENDENCY: ${{ inputs.dependency-name }}
         PREVIOUS: ${{ inputs.previous-version }}
         NEW: ${{ inputs.new-version }}
+        PR_BODY: ${{ inputs.pr-body }}
         RELEASE_NOTES_URL: ${{ inputs.release-notes-url }}
         HINTS: ${{ inputs.hints }}
       run: |
@@ -59,11 +75,31 @@ runs:
           RELEASE_NOTES_PHRASE=" ($RELEASE_NOTES_URL)"
         fi
 
-        BODY="@claude This pull request is a **major version** upgrade: \`$DEPENDENCY\` \`$PREVIOUS\` → \`$NEW\`.
+        # previous-version/new-version come back blank from fetch-metadata
+        # whenever a PR groups more than one package — only show the arrow
+        # when we actually have both, instead of rendering empty backticks.
+        VERSION_ARROW=""
+        if [ -n "$PREVIOUS" ] && [ -n "$NEW" ]; then
+          VERSION_ARROW=" \`$PREVIOUS\` → \`$NEW\`"
+        fi
+
+        PR_BODY_SECTION=""
+        if [ -n "$PR_BODY" ]; then
+          PR_BODY_SECTION="
+
+        <details>
+        <summary>Original PR description (optional additional context — Dependabot's own per-package version table, useful when this covers multiple dependencies or the version above is blank/incomplete)</summary>
+
+        $PR_BODY
+
+        </details>"
+        fi
+
+        BODY="@claude This pull request is a **major version** upgrade: \`$DEPENDENCY\`$VERSION_ARROW.
 
         Please review it for breaking changes and act as follows:
 
-        1. **Research** — Read the changelog/release notes for \`$DEPENDENCY\` covering every version between \`$PREVIOUS\` (exclusive) and \`$NEW\` (inclusive)$RELEASE_NOTES_PHRASE. Focus on removed/renamed APIs, changed defaults, config schema changes, and new peer-dependency or runtime requirements.
+        1. **Research** — Read the changelog/release notes for \`$DEPENDENCY\` covering every version between its previous version (exclusive) and its new version (inclusive)$RELEASE_NOTES_PHRASE. If this covers multiple dependencies or the version numbers above are blank, determine the exact per-dependency versions from the PR description below (if present) and the PR diff/lockfile first — treat the inputs above as a hint, not ground truth. Focus on removed/renamed APIs, changed defaults, config schema changes, and new peer-dependency or runtime requirements.$PR_BODY_SECTION
 
         2. **Assess** — Check this repository's actual usage of \`$DEPENDENCY\` (config files, imports, CI workflows, related tooling) against those breaking changes, and whether any other dependency here is incompatible with the new major version."
 
@@ -82,7 +118,7 @@ runs:
 
         5. **Reply** — Post a single summary comment on this PR with exactly this structure:
 
-        ## Major upgrade review: \`$DEPENDENCY\` $PREVIOUS → $NEW
+        ## Major upgrade review: \`$DEPENDENCY\`$VERSION_ARROW
 
         **Verdict:** ✅ Compatible as-is / 🔧 Compatible, changes applied / ⚠️ Needs manual follow-up / ❌ Not compatible
 
