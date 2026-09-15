@@ -200,34 +200,54 @@ Requires `contents: write` and `pull-requests: write` permissions on the calling
 
 ---
 
-### `review-major-upgrade`
+### `review-dependency-update`
 
-Posts a comment asking Claude to review a major-version dependency bump: check compatibility with the repo (and its other dependencies), make safe fixes directly on the PR branch, and reply with a structured summary. Used internally by [`update-turbo`](#update-turbo) and [`update-pnpm`](#update-pnpm), and by the [Dependabot major version review](#dependabot-major-version-review) workflow below — it can also be called directly from any workflow that opens or reacts to a major-version-bump PR.
+Posts a comment asking Claude to review a dependency update — one package or a grouped multi-package bump, any severity: check compatibility with the repo (and its other dependencies), make safe fixes directly on the PR branch, and reply with a structured summary. Used internally by [`update-turbo`](#update-turbo) and [`update-pnpm`](#update-pnpm), and by the [Dependabot dependency review](#dependabot-dependency-review) workflow below — it can also be called directly from any workflow that opens or reacts to a dependency-update PR.
 
 Requires the [Claude GitHub App](https://github.com/apps/claude) to be installed on the repository so that `@claude` mentions are picked up.
 
+`dependabot/fetch-metadata`'s `previous-version`/`new-version` outputs are only reliable for single-dependency updates — they come back blank for grouped updates covering more than one package. Pass `pr-body` in that case: Dependabot always renders a structured per-package version table into the PR body it generates, regardless of grouping, and Claude sources exact versions from there instead.
+
+Single dependency, versions known precisely:
+
 ```yaml
-- uses: eledg/github-actions/review-major-upgrade@v1
+- uses: eledg/github-actions/review-dependency-update@v1
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
     pr-number: ${{ steps.create-pr.outputs.pull-request-number }}
     dependency-name: some-package
     previous-version: "3.4.0"
     new-version: "4.0.0"
+    severity: major
     # release-notes-url: https://github.com/owner/some-package/releases/tag/v4.0.0
     # hints: |
-    #   - Specific config file or API this dependency's major bumps tend to affect
+    #   - Specific config file or API this dependency's updates tend to affect
 ```
 
-| Input                | Required | Default | Description                                                                      |
-| --------------------- | -------- | ------- | --------------------------------------------------------------------------------- |
-| `github-token`        | Yes      | —       | GitHub token with `pull-requests: write`, used to post the comment                |
-| `pr-number`           | Yes      | —       | Pull request number to comment on                                                 |
-| `dependency-name`     | Yes      | —       | Name of the dependency being bumped (comma-separated for grouped updates)         |
-| `previous-version`    | Yes      | —       | Current version                                                                    |
-| `new-version`         | Yes      | —       | New (major-bumped) version                                                         |
-| `release-notes-url`   | No       | `''`    | Direct link to the changelog/release notes. If omitted, Claude looks them up itself |
-| `hints`               | No       | `''`    | Freeform extra context appended to the prompt, one bullet point per line          |
+Grouped update, versions sourced from the PR body:
+
+```yaml
+- uses: eledg/github-actions/review-dependency-update@v1
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    pr-number: ${{ github.event.pull_request.number }}
+    dependency-name: ${{ steps.metadata.outputs.dependency-names }}
+    severity: ${{ steps.metadata.outputs.update-type }}
+    pr-body: ${{ github.event.pull_request.body }}
+```
+
+| Input                | Required | Default | Description                                                                                          |
+| --------------------- | -------- | ------- | ------------------------------------------------------------------------------------------------------ |
+| `github-token`        | Yes      | —       | GitHub token with `pull-requests: write`, used to post the comment                                     |
+| `pr-number`           | Yes      | —       | Pull request number to comment on                                                                      |
+| `dependency-name`     | Yes      | —       | Name of the dependency being updated (comma-separated for grouped updates)                              |
+| `previous-version`    | No       | `''`    | Current version, if known precisely. Reliable only for single-dependency updates                        |
+| `new-version`         | No       | `''`    | New version, if known precisely. Same caveat as `previous-version`                                       |
+| `severity`            | No       | `''`    | `major`/`minor`/`patch`, or Dependabot's `version-update:semver-major` form. Empty/unrecognized is always reviewed |
+| `min-severity`        | No       | `minor` | Skip (no comment) if `severity` ranks below this. Default reviews major + minor, skips patch             |
+| `pr-body`             | No       | `''`    | Full PR body — pass it for grouped updates so Claude can source exact per-dependency versions             |
+| `release-notes-url`   | No       | `''`    | Direct link to the changelog/release notes. If omitted, Claude looks them up itself                      |
+| `hints`               | No       | `''`    | Freeform extra context appended to the prompt, one bullet point per line                                 |
 
 Requires `pull-requests: write` permission on the calling workflow.
 
@@ -282,14 +302,14 @@ No inputs.
 
 ---
 
-### Dependabot major version review
+### Dependabot dependency review
 
-Add a workflow to any repo that uses Dependabot, so that a major-version-bump PR gets an `@claude` comment asking it to check compatibility and fix what it safely can. Uses [`review-major-upgrade`](#review-major-upgrade) under the hood.
+Add a workflow to any repo that uses Dependabot, so that a dependency-update PR gets an `@claude` comment asking it to check compatibility and fix what it safely can. Uses [`review-dependency-update`](#review-dependency-update) under the hood.
 
 This must trigger on `pull_request_target`, not `pull_request`: GitHub always gives `pull_request`-triggered workflows a **read-only** token with no secrets when the PR author is Dependabot, regardless of the `permissions:` block, so a plain `pull_request` workflow can't post a comment. `pull_request_target` runs with the base repo's normal permissions instead. This is safe here because the workflow never checks out or runs the PR's code — it only reads event metadata and calls the GitHub API.
 
 ```yaml
-name: Dependabot major version review
+name: Dependabot dependency review
 
 on:
   pull_request_target:
@@ -299,7 +319,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  review-major-bump:
+  review-dependency-update:
     if: github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
@@ -309,18 +329,22 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Ask Claude to review major upgrade
-        if: steps.metadata.outputs.update-type == 'version-update:semver-major'
-        uses: eledg/github-actions/review-major-upgrade@v1
+      - name: Ask Claude to review dependency update
+        uses: eledg/github-actions/review-dependency-update@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           pr-number: ${{ github.event.pull_request.number }}
           dependency-name: ${{ steps.metadata.outputs.dependency-names }}
           previous-version: ${{ steps.metadata.outputs.previous-version }}
           new-version: ${{ steps.metadata.outputs.new-version }}
+          severity: ${{ steps.metadata.outputs.update-type }}
+          pr-body: ${{ github.event.pull_request.body }}
+          # min-severity defaults to `minor` — reviews major and minor
+          # updates, skips patch. Set to `patch` to review everything, or
+          # `major` to only review major bumps.
 ```
 
-[`dependabot/fetch-metadata`](https://github.com/dependabot/fetch-metadata) is GitHub's own action for reading Dependabot PR metadata (dependency name, versions, and `update-type`) without parsing the PR title. For grouped updates it reports the highest-severity update type across the group, and the dependency/version outputs may cover more than one package — Claude is told to check the actual PR diff and changelogs itself rather than relying solely on these inputs.
+[`dependabot/fetch-metadata`](https://github.com/dependabot/fetch-metadata) is GitHub's own action for reading Dependabot PR metadata (dependency name, versions, and `update-type`) without parsing the PR title. For grouped updates it reports the highest-severity update type across the group, but its `previous-version`/`new-version` outputs come back **blank**, not just imprecise — `review-dependency-update`'s `pr-body` input works around this by having Claude read Dependabot's own per-package version table from the PR description instead.
 
 Requires `pull-requests: write` permission on the calling workflow, and the [Claude GitHub App](https://github.com/apps/claude) installed on the repository.
 
@@ -330,15 +354,7 @@ Requires `pull-requests: write` permission on the calling workflow, and the [Cla
 
 Consuming repos pin to a major version tag (e.g. `@v1`). Dependabot in each consuming repo will open PRs when a new version is published here.
 
-To release a new version, push a tag:
-
-```bash
-git tag v1.x.x
-git push origin v1.x.x
-# Move the floating major tag
-git tag -f v1
-git push origin v1 --force
-```
+Releases are automated by [`release.yml`](.github/workflows/release.yml) via `semantic-release` on every push to `main` — don't tag manually. The version bump comes from the conventional-commit type of each merged commit (configured in [`.releaserc.json`](.releaserc.json)): `fix` → patch, `feat` → minor, a `BREAKING CHANGE:` footer (or `!` after the type) → major. Once a release publishes, the same workflow force-moves the floating major tag (e.g. `v1`) to it, so pinned consumers pick it up automatically.
 
 ## Dependency updates
 
@@ -346,4 +362,4 @@ Upstream actions referenced in `.github/workflows/` are kept up to date by Depen
 
 Upstream actions referenced inside composite `action.yml` files are kept up to date by the `check-action-dependencies` workflow in this repo, which runs every Friday and opens a PR with any major-version bumps. Consuming repos can use the `check-action-dependencies` action to get the same coverage for their own composite actions.
 
-Once Dependabot (or `check-action-dependencies`) opens a major-version-bump PR, consuming repos can add the [Dependabot major version review](#dependabot-major-version-review) workflow to have Claude check compatibility and fix what it safely can before a human reviews it.
+Once Dependabot (or `check-action-dependencies`) opens a dependency-update PR, consuming repos can add the [Dependabot dependency review](#dependabot-dependency-review) workflow to have Claude check compatibility and fix what it safely can before a human reviews it.

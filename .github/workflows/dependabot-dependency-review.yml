@@ -1,4 +1,4 @@
-name: Dependabot major version review
+name: Dependabot dependency review
 
 on:
   pull_request_target:
@@ -8,7 +8,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  review-major-bump:
+  review-dependency-update:
     if: github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
@@ -22,12 +22,16 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Ask Claude to review major upgrade
-        if: steps.metadata.outputs.update-type == 'version-update:semver-major'
-        uses: ./review-major-upgrade
+      - name: Ask Claude to review dependency update
+        uses: ./review-dependency-update
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           pr-number: ${{ github.event.pull_request.number }}
           dependency-name: ${{ steps.metadata.outputs.dependency-names }}
           previous-version: ${{ steps.metadata.outputs.previous-version }}
           new-version: ${{ steps.metadata.outputs.new-version }}
+          severity: ${{ steps.metadata.outputs.update-type }}
+          pr-body: ${{ github.event.pull_request.body }}
+          # min-severity defaults to `minor` — reviews major and minor
+          # updates, skips patch. Set to `patch` to review everything, or
+          # `major` to match the old major-only behavior.

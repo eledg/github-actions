@@ -156,15 +156,17 @@ runs:
         reviewers: ${{ inputs.reviewers }}
         assignees: ${{ inputs.assignees }}
 
-    - name: Ask Claude to review major upgrade
-      if: steps.latest.outputs.version != steps.current.outputs.version && steps.bump.outputs.type == 'major'
-      uses: eledg/github-actions/review-major-upgrade@v1
+    - name: Ask Claude to review dependency update
+      if: steps.latest.outputs.version != steps.current.outputs.version
+      uses: ./review-dependency-update
       with:
         github-token: ${{ inputs.github-token }}
         pr-number: ${{ steps.create-pr.outputs.pull-request-number }}
         dependency-name: pnpm
         previous-version: ${{ steps.current.outputs.version }}
         new-version: ${{ steps.latest.outputs.version }}
+        severity: ${{ steps.bump.outputs.type }}
+        min-severity: major
         release-notes-url: https://github.com/pnpm/pnpm/releases/tag/v${{ steps.latest.outputs.version }}
         hints: |
           - `pnpm-lock.yaml` format

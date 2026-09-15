@@ -1,0 +1,179 @@
+name: Review dependency update
+description: >
+  Posts a comment asking Claude to review a dependency update — one package
+  or a grouped multi-package bump, any severity: check compatibility, make
+  safe fixes, and reply with a structured summary.
+inputs:
+  github-token:
+    description: >
+      GitHub token with pull-requests:write permission, used to post the
+      comment. Pass secrets.GITHUB_TOKEN from the calling workflow.
+    required: true
+  pr-number:
+    description: Pull request number to comment on.
+    required: true
+  dependency-name:
+    description: >
+      Name of the dependency being updated. Comma-separated for grouped
+      updates.
+    required: true
+  previous-version:
+    description: >
+      Current version, if known precisely. Optional — reliable only for
+      single-dependency updates. Leave blank for grouped updates and pass
+      pr-body instead; a single scalar can't represent every package in a
+      group.
+    required: false
+    default: ""
+  new-version:
+    description: New version, if known precisely. Same caveat as previous-version.
+    required: false
+    default: ""
+  severity:
+    description: >
+      The update's severity, as the caller already knows it. Accepts either
+      bare major/minor/patch (e.g. from a local semver diff) or Dependabot's
+      version-update:semver-major form (from dependabot/fetch-metadata's
+      update-type output). Leave blank if unknown — an unrecognized or empty
+      value is always reviewed, never skipped.
+    required: false
+    default: ""
+  min-severity:
+    description: >
+      Minimum severity to review: patch, minor, or major. Updates below this
+      are skipped (no comment posted). Default minor reviews major and minor
+      updates and skips patch.
+    required: false
+    default: minor
+  pr-body:
+    description: >
+      Full PR body/description — pass the pull_request event's body. Dependabot
+      always renders a structured per-package version table here,
+      even for grouped updates — pass this so Claude can source exact
+      versions when previous-version/new-version are blank or imprecise.
+    required: false
+    default: ""
+  release-notes-url:
+    description: >
+      Direct link to the changelog/release notes, if known. If omitted,
+      Claude is asked to find them itself.
+    required: false
+    default: ""
+  hints:
+    description: >
+      Freeform extra context appended to the prompt, e.g. specific files or
+      config likely affected by the update. One bullet point per line.
+    required: false
+    default: ""
+runs:
+  using: composite
+  steps:
+    - name: Ask Claude to review dependency update
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        # gh infers the target repo from the git remote in cwd when this
+        # isn't set. Callers that (correctly) skip actions/checkout — e.g.
+        # a pull_request_target workflow that never needs PR code — have no
+        # .git directory, so gh fails with "not a git repository" unless we
+        # tell it explicitly.
+        GH_REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+        DEPENDENCY: ${{ inputs.dependency-name }}
+        PREVIOUS: ${{ inputs.previous-version }}
+        NEW: ${{ inputs.new-version }}
+        SEVERITY: ${{ inputs.severity }}
+        MIN_SEVERITY: ${{ inputs.min-severity }}
+        PR_BODY: ${{ inputs.pr-body }}
+        RELEASE_NOTES_URL: ${{ inputs.release-notes-url }}
+        HINTS: ${{ inputs.hints }}
+      run: |
+        rank() {
+          case "${1#version-update:semver-}" in
+            patch) echo 1 ;;
+            minor) echo 2 ;;
+            major) echo 3 ;;
+            *) echo 0 ;;
+          esac
+        }
+
+        SEVERITY_RANK=$(rank "$SEVERITY")
+        MIN_RANK=$(rank "$MIN_SEVERITY")
+        if [ "$SEVERITY_RANK" -ne 0 ] && [ "$SEVERITY_RANK" -lt "$MIN_RANK" ]; then
+          echo "Severity '$SEVERITY' is below min-severity '$MIN_SEVERITY' — skipping."
+          exit 0
+        fi
+
+        DEP_LABEL="dependency"
+        case "$DEPENDENCY" in
+          *,*) DEP_LABEL="dependencies" ;;
+        esac
+
+        VERSION_HINT=""
+        if [ -n "$PREVIOUS" ] && [ -n "$NEW" ]; then
+          VERSION_HINT=" (reported as \`$PREVIOUS\` → \`$NEW\` by the workflow that opened this PR — treat as a hint, not ground truth)"
+        fi
+
+        PR_BODY_SECTION=""
+        if [ -n "$PR_BODY" ]; then
+          PR_BODY_SECTION="
+
+        <details>
+        <summary>Original PR description (source of truth for exact per-dependency versions)</summary>
+
+        $PR_BODY
+
+        </details>"
+        fi
+
+        RELEASE_NOTES_PHRASE=""
+        if [ -n "$RELEASE_NOTES_URL" ]; then
+          RELEASE_NOTES_PHRASE=" ($RELEASE_NOTES_URL)"
+        fi
+
+        BODY="@claude This pull request updates the following $DEP_LABEL: \`$DEPENDENCY\`$VERSION_HINT.
+
+        Please review it for breaking changes and act as follows:
+
+        1. **Identify exact versions** — For each dependency listed above, determine its precise previous and new version. The version inputs above are reliable only for single-dependency updates and are often blank or imprecise for grouped updates — always cross-check against the PR description below (if present) and the PR diff/lockfile, which are authoritative.$PR_BODY_SECTION
+
+        2. **Research** — For each dependency, read the changelog/release notes covering every version between its previous version (exclusive) and its new version (inclusive)$RELEASE_NOTES_PHRASE. Focus on removed/renamed APIs, changed defaults, config schema changes, and new peer-dependency or runtime requirements.
+
+        3. **Assess** — Check this repository's actual usage of each dependency (config files, imports, CI workflows, related tooling) against those changes, and whether any other dependency here is incompatible with the new versions."
+
+        if [ -n "$HINTS" ]; then
+          BODY="$BODY
+
+        Specifically check:
+        $HINTS"
+        fi
+
+        BODY="$BODY
+
+        4. **Fix, if safe** — If a change requires an update and the fix is unambiguous (a documented codemod, a renamed config key, an updated import path), make the change directly on this PR branch and commit it. Don't touch unrelated files, don't upgrade other dependencies, and don't change behavior beyond what compatibility requires.
+
+        5. **Escalate, if unsafe** — If a fix needs a judgment call (ambiguous migration path, a behavior change with product implications, no test coverage to verify correctness), don't guess — leave it and say so explicitly.
+
+        6. **Reply** — Post a single summary comment on this PR with exactly this structure:
+
+        ## Dependency update review: \`$DEPENDENCY\`
+
+        **Overall verdict:** ✅ Compatible as-is / 🔧 Compatible, changes applied / ⚠️ Needs manual follow-up / ❌ Not compatible
+        _(worst case across every dependency below)_
+
+        | Dependency | Change | Severity | Verdict |
+        | --- | --- | --- | --- |
+        | \`name\` | \`prev\` → \`new\` | major/minor/patch | ✅/🔧/⚠️/❌ |
+
+        ### What changed upstream
+        - (breaking changes relevant to this repo's usage, or \"None found relevant to this repo's usage\")
+
+        ### Changes made
+        - (files changed and why, or \"None needed\")
+
+        ### Follow-up needed
+        - (anything a human must still check or decide, or \"None\")
+
+        Keep it concise — a human is deciding whether to merge based on this comment."
+
+        gh pr comment "$PR_NUMBER" --body "$BODY"
