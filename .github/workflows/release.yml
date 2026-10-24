@@ -18,7 +18,7 @@ jobs:
           fetch-depth: 0
       - id: semantic-release
         name: Semantic release
-        uses: cycjimmy/semantic-release-action@v6
+        uses: cycjimmy/semantic-release-action@v8
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Update major version tag
