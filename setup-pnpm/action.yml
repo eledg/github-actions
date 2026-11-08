@@ -5,12 +5,16 @@ inputs:
     description: Cache the .turbo directory between runs. Set to 'false' for jobs that do not run turbo tasks.
     required: false
     default: 'false'
+  node-version:
+    description: Node.js version to install (passed to actions/setup-node).
+    required: false
+    default: "26"
 runs:
   using: composite
   steps:
     - uses: actions/setup-node@v7
       with:
-        node-version: 26
+        node-version: ${{ inputs.node-version }}
     - uses: pnpm/action-setup@v6
       name: Install pnpm
     - name: Get pnpm store directory

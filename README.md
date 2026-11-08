@@ -17,6 +17,7 @@ Installs Node.js 26, pnpm, restores the pnpm store cache, caches the Turborepo l
 | Input                | Required | Default | Description                                                                               |
 | -------------------- | -------- | ------- | ----------------------------------------------------------------------------------------- |
 | `enable-turbo-cache` | No       | `false` | Cache the `.turbo` directory between runs. Set to `'true'` for jobs that run turbo tasks. |
+| `node-version`       | No       | `26`    | Node.js version to install                                                                |
 
 ---
 
@@ -187,6 +188,7 @@ Checks for a newer pnpm version on npm and opens a PR to update the `packageMana
 | `reviewers`    | No       | `''`    | Comma or newline separated list of pull request reviewers      |
 | `assignees`    | No       | `''`    | Comma or newline separated list of pull request assignees      |
 | `labels`       | No       | `build` | Labels to apply to the pull request                            |
+| `node-version` | No       | `26`    | Node.js version to install                                     |
 
 Requires `contents: write` and `pull-requests: write` permissions on the calling workflow.
 
@@ -261,6 +263,7 @@ Requires dependencies to already be installed — run [`setup-pnpm`](#setup-pnpm
 | `reviewers`    | No       | `''`    | Comma or newline separated list of pull request reviewers      |
 | `assignees`    | No       | `''`    | Comma or newline separated list of pull request assignees      |
 | `labels`       | No       | `build` | Labels to apply to the pull request                            |
+| `node-version` | No       | `26`    | Node.js version to install                                     |
 
 Requires `contents: write` and `pull-requests: write` permissions on the calling workflow.
 
