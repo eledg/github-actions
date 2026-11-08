@@ -20,6 +20,10 @@ inputs:
     description: Labels to apply to the pull request.
     required: false
     default: build
+  node-version:
+    description: Node.js version to install (passed to actions/setup-node).
+    required: false
+    default: "lts/*"
 runs:
   using: composite
   steps:
@@ -61,7 +65,7 @@ runs:
       if: steps.latest.outputs.version != steps.current.outputs.version
       uses: actions/setup-node@v7
       with:
-        node-version: lts/*
+        node-version: ${{ inputs.node-version }}
 
     - name: Update packageManager field
       if: steps.latest.outputs.version != steps.current.outputs.version
