@@ -6,7 +6,7 @@ Shared composite GitHub Actions used across eledg projects.
 
 ### `setup-pnpm`
 
-Installs Node.js 24, pnpm, restores the pnpm store cache, caches the Turborepo local cache, and installs dependencies.
+Installs Node.js 26, pnpm, restores the pnpm store cache, caches the Turborepo local cache, and installs dependencies.
 
 ```yaml
 - uses: eledg/github-actions/setup-pnpm@v1
