@@ -23,7 +23,7 @@ inputs:
   node-version:
     description: Node.js version to install (passed to actions/setup-node).
     required: false
-    default: "26"
+    default: "lts/*"
 runs:
   using: composite
   steps:
