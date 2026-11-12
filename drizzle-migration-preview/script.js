@@ -115,19 +115,53 @@ ${footer}`;
       {
         name: 'Index concurrency',
         test: (sql) => {
-          const createIndexMatches = sql.match(/CREATE\s+(?:UNIQUE\s+)?INDEX/gi);
-          const concurrentMatches = sql.match(/CREATE\s+(?:UNIQUE\s+)?INDEX\s+CONCURRENTLY/gi);
-          if (!createIndexMatches) {
+          // A table name as written after CREATE TABLE or ON: optionally schema-qualified,
+          // optionally quoted. Compared without the schema or quotes.
+          const name = String.raw`((?:"[^"]+"|[\w$]+)(?:\s*\.\s*(?:"[^"]+"|[\w$]+))?)`;
+          const bareName = (qualified) =>
+            qualified.split('.').pop().trim().replace(/^"|"$/g, '');
+
+          // Tables these migrations create are new: nothing reads or writes them until the
+          // migration commits, so an index on one cannot lock anything. CONCURRENTLY is not
+          // needed there, and cannot run inside the transaction Drizzle's migrator uses.
+          const newTables = new Set(
+            [
+              ...sql.matchAll(
+                new RegExp(String.raw`CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?${name}`, 'gi'),
+              ),
+            ].map((match) => bareName(match[1])),
+          );
+          const indexes = [
+            ...sql.matchAll(
+              new RegExp(
+                String.raw`CREATE\s+(?:UNIQUE\s+)?INDEX\s+(CONCURRENTLY\s+)?(?:IF\s+NOT\s+EXISTS\s+)?(?:(?:"[^"]+"|[\w$]+)\s+)?ON\s+(?:ONLY\s+)?${name}`,
+                'gi',
+              ),
+            ),
+          ].map((match) => ({
+            concurrent: Boolean(match[1]),
+            table: bareName(match[2]),
+          }));
+          if (indexes.length === 0) {
             return { pass: true, details: '✅ No index creation detected' };
           }
-          const nonConcurrent =
-            createIndexMatches.length - (concurrentMatches?.length || 0);
+
+          const onNewTables = indexes.filter(
+            (index) => !index.concurrent && newTables.has(index.table),
+          ).length;
+          const risky = indexes.filter(
+            (index) => !index.concurrent && !newTables.has(index.table),
+          ).length;
+          const newTablesNote =
+            onNewTables > 0
+              ? ` (${onNewTables} on tables created in this PR, where CONCURRENTLY is not needed)`
+              : '';
           return {
-            pass: nonConcurrent === 0,
+            pass: risky === 0,
             details:
-              nonConcurrent > 0
-                ? `⚠️ ${nonConcurrent} index(es) created without CONCURRENTLY — may lock tables`
-                : '✅ All indexes created with CONCURRENTLY',
+              risky > 0
+                ? `⚠️ ${risky} index(es) on existing tables created without CONCURRENTLY — may lock tables${newTablesNote}`
+                : `✅ No index on an existing table is created without CONCURRENTLY${newTablesNote}`,
           };
         },
       },
