@@ -34,12 +34,13 @@ Deploys a Vercel project to preview or production.
     vercel-token: ${{ secrets.VERCEL_TOKEN }}
 ```
 
-| Input               | Required | Default | Description                     |
-| ------------------- | -------- | ------- | ------------------------------- |
-| `production`        | No       | `false` | Deploy to production (`--prod`) |
-| `vercel-org-id`     | Yes      | —       | Vercel organisation ID          |
-| `vercel-project-id` | Yes      | —       | Vercel project ID               |
-| `vercel-token`      | Yes      | —       | Vercel auth token               |
+| Input               | Required | Default | Description                                                              |
+| ------------------- | -------- | ------- | ------------------------------------------------------------------------ |
+| `production`        | No       | `false` | Deploy to production (`--prod`)                                          |
+| `vercel-org-id`     | Yes      | —       | Vercel organisation ID                                                   |
+| `vercel-project-id` | Yes      | —       | Vercel project ID                                                        |
+| `vercel-token`      | Yes      | —       | Vercel auth token                                                        |
+| `build-env`         | No       | —       | Build-time env vars for the Vercel build, one `KEY=value` per line (`--build-env`) |
 
 ---
 

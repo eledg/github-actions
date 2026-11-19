@@ -14,6 +14,10 @@ inputs:
   vercel-token:
     description: Vercel token
     required: true
+  build-env:
+    description: Build-time environment variables for the Vercel build, one KEY=value per line
+    required: false
+    default: ''
 runs:
   using: composite
   steps:
@@ -25,8 +29,16 @@ runs:
       run: npm i -g vercel
       shell: bash
     - name: Deploy project artifacts to Vercel
-      run: vercel ${{ inputs.production == 'true' && '--prod' || '' }} --token=${{ inputs.vercel-token }} --logs
+      run: |
+        args=()
+        while IFS= read -r line; do
+          if [ -n "$line" ]; then args+=(--build-env "$line"); fi
+        done <<< "$BUILD_ENV"
+        vercel $PROD_FLAG --token="$VERCEL_TOKEN" --logs "${args[@]}"
       shell: bash
       env:
+        BUILD_ENV: ${{ inputs.build-env }}
+        PROD_FLAG: ${{ inputs.production == 'true' && '--prod' || '' }}
+        VERCEL_TOKEN: ${{ inputs.vercel-token }}
         VERCEL_ORG_ID: ${{ inputs.vercel-org-id }}
         VERCEL_PROJECT_ID: ${{ inputs.vercel-project-id }}
