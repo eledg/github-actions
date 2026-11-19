@@ -1,5 +1,10 @@
 name: Setup Playwright
 description: Install Playwright Chromium with caching
+inputs:
+  filter:
+    description: pnpm workspace filter for the package that runs Playwright
+    required: false
+    default: web
 
 runs:
   using: composite
@@ -10,10 +15,12 @@ runs:
         path: ~/.cache/ms-playwright
         key: playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
 
-    - run: pnpm --filter ui exec playwright install --with-deps chromium
+    # --fail-if-no-match: without it pnpm exits 0 when the filter matches nothing,
+    # silently skipping the install
+    - run: pnpm --filter ${{ inputs.filter }} --fail-if-no-match exec playwright install --with-deps chromium
       if: steps.playwright-cache.outputs.cache-hit != 'true'
       shell: bash
 
-    - run: pnpm --filter ui exec playwright install-deps chromium
+    - run: pnpm --filter ${{ inputs.filter }} --fail-if-no-match exec playwright install-deps chromium
       if: steps.playwright-cache.outputs.cache-hit == 'true'
       shell: bash

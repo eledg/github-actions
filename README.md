@@ -280,13 +280,17 @@ Requires `contents: write` and `pull-requests: write` permissions on the calling
 
 ### `setup-playwright`
 
-Installs Playwright Chromium for the `ui` workspace with caching. On a cache hit, only the system dependencies are installed (skipping the full browser download).
+Installs Playwright Chromium for a pnpm workspace with caching. On a cache hit, only the system dependencies are installed (skipping the full browser download). Fails if the filter matches no workspace.
 
 ```yaml
 - uses: eledg/github-actions/setup-playwright@v1
+  # with:
+  #   filter: app   # override if your Playwright workspace is not named 'web'
 ```
 
-No inputs.
+| Input    | Required | Default | Description                                                |
+| -------- | -------- | ------- | ---------------------------------------------------------- |
+| `filter` | No       | `web`   | pnpm workspace filter for the package that runs Playwright |
 
 ---
 
