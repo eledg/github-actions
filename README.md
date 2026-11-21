@@ -104,6 +104,7 @@ Assumes an AWS IAM role via OIDC and runs `pnpm --filter <filter> synth -- -c <c
 | `aws-region`     | No       | `eu-west-1` | AWS region                                                |
 | `filter`         | No       | `infra`     | pnpm workspace filter for the CDK app                     |
 | `context-key`    | No       | `envName`   | CDK context key passed via `-c KEY=value`                 |
+| `app`            | No       | —           | CDK app command passed as `--app`; defaults to `cdk.json` |
 
 Requires `id-token: write` permission on the calling job.
 
@@ -129,8 +130,31 @@ Assumes an AWS IAM role via OIDC and runs `pnpm --filter <filter> diff -- -c <co
 | `aws-region`     | No       | `eu-west-1` | AWS region                                                |
 | `filter`         | No       | `infra`     | pnpm workspace filter for the CDK app                     |
 | `context-key`    | No       | `envName`   | CDK context key passed via `-c KEY=value`                 |
+| `app`            | No       | —           | CDK app command passed as `--app`; defaults to `cdk.json` |
+| `label`          | No       | —           | PR comment heading; each label gets its own comment       |
 
 Requires `id-token: write` and `pull-requests: write` permissions on the calling job.
+
+Without a `label`, the action keeps one comment per PR. With one, each label gets its own comment, headed and
+footed with the label, so a PR can show the diff of several environments, each assumed with its own role. Run one
+`cdk-diff` per environment, for example in separate jobs. When the CDK prints each stack's environment, the table
+shows its account and region.
+
+```yaml
+- uses: eledg/github-actions/cdk-diff@v1
+  with:
+    role-to-assume: arn:aws:iam::111111111111:role/github-diff
+    env-name: staging
+    aws-region: eu-west-2
+    label: staging
+# A second CDK app in the same workspace, diffed against another account
+- uses: eledg/github-actions/cdk-diff@v1
+  with:
+    role-to-assume: arn:aws:iam::222222222222:role/github-diff-legacy
+    env-name: legacy
+    app: pnpm exec tsx src/legacy.ts
+    label: legacy
+```
 
 ---
 
