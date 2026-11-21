@@ -19,6 +19,14 @@ inputs:
     description: CDK context key passed via -c KEY=value
     required: false
     default: envName
+  app:
+    description: CDK app command, passed as --app (defaults to the app in cdk.json)
+    required: false
+    default: ''
+  label:
+    description: Environment name shown in the PR comment; each label gets its own comment
+    required: false
+    default: ''
 outputs:
   comment-id:
     description: ID of the created/updated comment
@@ -33,16 +41,22 @@ runs:
         aws-region: ${{ inputs.aws-region }}
     - name: Run CDK Diff
       if: ${{ github.event_name != 'pull_request' }}
-      run: pnpm --filter ${{ inputs.filter }} exec cdk diff -c ${{ inputs.context-key }}=${{ inputs.env-name }}
+      run: pnpm --filter ${{ inputs.filter }} exec cdk diff -c ${{ inputs.context-key }}=${{ inputs.env-name }} ${CDK_APP:+--app "$CDK_APP"}
       shell: bash
+      env:
+        CDK_APP: ${{ inputs.app }}
     - name: Run CDK Diff (PR)
       if: ${{ github.event_name == 'pull_request' }}
-      run: pnpm --filter ${{ inputs.filter }} exec cdk diff -c ${{ inputs.context-key }}=${{ inputs.env-name }} > cdk-diff.txt || true
+      run: pnpm --filter ${{ inputs.filter }} exec cdk diff -c ${{ inputs.context-key }}=${{ inputs.env-name }} ${CDK_APP:+--app "$CDK_APP"} > cdk-diff.txt || true
       shell: bash
+      env:
+        CDK_APP: ${{ inputs.app }}
     - name: Comment on PR
       id: comment
       if: ${{ github.event_name == 'pull_request' }}
       uses: actions/github-script@v9
+      env:
+        DIFF_LABEL: ${{ inputs.label }}
       with:
         result-encoding: string
         script: |

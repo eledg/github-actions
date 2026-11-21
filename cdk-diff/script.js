@@ -17,7 +17,12 @@ module.exports = async ({ github, context }) => {
   const fs = require('fs');
   const diffOutput = fs.readFileSync('cdk-diff.txt', 'utf8');
 
-  const commentMarker = '<!-- cdk-diff-comment -->';
+  // Each label gets its own comment, so one PR can show several environments' diffs. No label keeps the original
+  // marker, which is not a substring of a labelled one.
+  const label = process.env.DIFF_LABEL?.trim() || '';
+  const commentMarker = label
+    ? `<!-- cdk-diff-comment:${label} -->`
+    : '<!-- cdk-diff-comment -->';
   const { commitSha, timestamp, prNumber } = getCommentContext(context);
 
   // Parse stack-level changes from the diff output
@@ -26,13 +31,17 @@ module.exports = async ({ github, context }) => {
     .filter((s) => s.startsWith('Stack '));
 
   const stacks = stackSections.map((section) => {
-    const nameMatch = section.match(/^Stack (\S+)/);
+    // e.g. "Stack my-stack (aws://123456789012/eu-west-2)"; older CDK versions print the name only.
+    const nameMatch = section.match(/^Stack (\S+)(?: \(aws:\/\/([^/)]+)\/([^)]+)\))?/);
     const name = nameMatch ? nameMatch[1] : 'Unknown';
+    const environment =
+      nameMatch && nameMatch[2] ? `${nameMatch[2]}/${nameMatch[3]}` : '';
     const hasNoChanges = section.includes('There were no differences');
     const hasResources = section.includes('Resources');
     const hasSecurityChanges = section.includes('Security Group Changes');
     return {
       name,
+      environment,
       hasChanges: !hasNoChanges && (hasResources || hasSecurityChanges),
     };
   });
@@ -40,11 +49,18 @@ module.exports = async ({ github, context }) => {
   const stacksWithChanges = stacks.filter((s) => s.hasChanges).length;
   const hasChanges = stacksWithChanges > 0;
 
+  // The account and region column shows which account each stack lands in, when the CDK prints it.
+  const showEnvironment = stacks.some((s) => s.environment);
+  const status = (s) => (s.hasChanges ? '⚠️ Changes' : '✅ No changes');
   let stackSummary = '';
   if (stacks.length > 0) {
-    stackSummary = `| Stack | Status |
+    stackSummary = showEnvironment
+      ? `| Stack | Account/Region | Status |
+|-------|----------------|--------|
+${stacks.map((s) => `| ${s.name} | ${s.environment || '—'} | ${status(s)} |`).join('\n')}`
+      : `| Stack | Status |
 |-------|--------|
-${stacks.map((s) => `| ${s.name} | ${s.hasChanges ? '⚠️ Changes' : '✅ No changes'} |`).join('\n')}`;
+${stacks.map((s) => `| ${s.name} | ${status(s)} |`).join('\n')}`;
   }
 
   let statusText;
@@ -62,13 +78,13 @@ ${stacks.map((s) => `| ${s.name} | ${s.hasChanges ? '⚠️ Changes' : '✅ No c
   }
 
   const footer = buildFooter({
-    label: 'CDK diff against production',
+    label: label ? `CDK diff against ${label}` : 'CDK diff',
     commitSha,
     timestamp,
   });
 
   const body = `${commentMarker}
-## 🏗️ CDK Infrastructure Changes
+## 🏗️ CDK Infrastructure Changes${label ? `: ${label}` : ''}
 
 ${stackSummary}
 
