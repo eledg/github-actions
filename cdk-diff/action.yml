@@ -41,16 +41,16 @@ runs:
         aws-region: ${{ inputs.aws-region }}
     - name: Run CDK Diff
       if: ${{ github.event_name != 'pull_request' }}
-      run: pnpm --filter ${{ inputs.filter }} exec cdk diff -c ${{ inputs.context-key }}=${{ inputs.env-name }} ${CDK_APP:+--app "$CDK_APP"}
+      run: pnpm --filter ${{ inputs.filter }} exec cdk diff -c ${{ inputs.context-key }}=${{ inputs.env-name }} ${APP_COMMAND:+--app "$APP_COMMAND"}
       shell: bash
       env:
-        CDK_APP: ${{ inputs.app }}
+        APP_COMMAND: ${{ inputs.app }}
     - name: Run CDK Diff (PR)
       if: ${{ github.event_name == 'pull_request' }}
-      run: pnpm --filter ${{ inputs.filter }} exec cdk diff -c ${{ inputs.context-key }}=${{ inputs.env-name }} ${CDK_APP:+--app "$CDK_APP"} > cdk-diff.txt || true
+      run: pnpm --filter ${{ inputs.filter }} exec cdk diff -c ${{ inputs.context-key }}=${{ inputs.env-name }} ${APP_COMMAND:+--app "$APP_COMMAND"} > cdk-diff.txt || true
       shell: bash
       env:
-        CDK_APP: ${{ inputs.app }}
+        APP_COMMAND: ${{ inputs.app }}
     - name: Comment on PR
       id: comment
       if: ${{ github.event_name == 'pull_request' }}
