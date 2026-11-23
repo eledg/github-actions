@@ -1,6 +1,12 @@
 name: Setup pnpm
-description: Install Node.js, pnpm, restore the pnpm store cache, and install dependencies
+description: Install Node.js and pnpm, and install dependencies, optionally from a cached pnpm store
 inputs:
+  cache-store:
+    description: >-
+      Restore and save the pnpm store with actions/cache. Off by default: on GitHub's runners, restoring the store
+      took longer than the few seconds it saved the install, in every repo measured.
+    required: false
+    default: 'false'
   enable-turbo-cache:
     description: Cache the .turbo directory between runs. Set to 'false' for jobs that do not run turbo tasks.
     required: false
@@ -18,10 +24,12 @@ runs:
     - uses: pnpm/action-setup@v6
       name: Install pnpm
     - name: Get pnpm store directory
+      if: inputs.cache-store == 'true'
       shell: bash
       run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
     - uses: actions/cache@v6
       name: Setup pnpm cache
+      if: inputs.cache-store == 'true'
       with:
         path: ${{ env.STORE_PATH }}
         key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
