@@ -1,12 +1,12 @@
 name: Setup pnpm
-description: Install Node.js, pnpm, optionally restore the pnpm store cache, and install dependencies
+description: Install Node.js and pnpm, and install dependencies, optionally from a cached pnpm store
 inputs:
   cache-store:
     description: >-
-      Restore and save the pnpm store with actions/cache. Set to 'false' when the store is large: unpacking it can
-      take longer than installing from the registry, and pnpm doesn't guarantee caching is faster.
+      Restore and save the pnpm store with actions/cache. Off by default: on GitHub's runners, restoring the store
+      took longer than the few seconds it saved the install, in every repo measured.
     required: false
-    default: 'true'
+    default: 'false'
   enable-turbo-cache:
     description: Cache the .turbo directory between runs. Set to 'false' for jobs that do not run turbo tasks.
     required: false

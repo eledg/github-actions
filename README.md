@@ -6,7 +6,7 @@ Shared composite GitHub Actions used across eledg projects.
 
 ### `setup-pnpm`
 
-Installs Node.js (LTS by default), pnpm, restores the pnpm store cache (unless turned off), caches the Turborepo local cache, and installs dependencies.
+Installs Node.js (LTS by default) and pnpm, optionally restores the pnpm store and Turborepo caches, and installs dependencies.
 
 ```yaml
 - uses: eledg/github-actions/setup-pnpm@v1
@@ -16,11 +16,11 @@ Installs Node.js (LTS by default), pnpm, restores the pnpm store cache (unless t
 
 | Input                | Required | Default | Description                                                                                                                                  |
 | -------------------- | -------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cache-store`        | No       | `true`  | Restore and save the pnpm store with `actions/cache`. Set to `'false'` when unpacking a large store takes longer than installing without it. |
+| `cache-store`        | No       | `false` | Restore and save the pnpm store with `actions/cache`. Set to `'true'` only if measuring shows it beats installing without it.               |
 | `enable-turbo-cache` | No       | `false` | Cache the `.turbo` directory between runs. Set to `'true'` for jobs that run turbo tasks.                                                    |
 | `node-version`       | No       | `lts/*` | Node.js version to install                                                                                                                   |
 
-pnpm's [CI guide](https://pnpm.io/continuous-integration) says caching the store isn't guaranteed to make installs faster. Measure both: a restore is a download plus unpacking every file in the store, which for a store of a few GB can take longer than `pnpm install` from the registry.
+The store cache is off by default. pnpm's [CI guide](https://pnpm.io/continuous-integration) says caching the store isn't guaranteed to make installs faster. On GitHub's runners a cold `pnpm install` was only 3–5 s slower than one from a restored store, but restoring took longer than that in every repo measured. It took 2–18 s for stores under 500 MB, ~50 s for 1 GB and ~60–100 s for 2.2 GB, mostly spent unpacking.
 
 ---
 
