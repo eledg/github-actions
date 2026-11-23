@@ -6,7 +6,7 @@ Shared composite GitHub Actions used across eledg projects.
 
 ### `setup-pnpm`
 
-Installs Node.js (LTS by default), pnpm, restores the pnpm store cache, caches the Turborepo local cache, and installs dependencies.
+Installs Node.js (LTS by default), pnpm, restores the pnpm store cache (unless turned off), caches the Turborepo local cache, and installs dependencies.
 
 ```yaml
 - uses: eledg/github-actions/setup-pnpm@v1
@@ -14,10 +14,13 @@ Installs Node.js (LTS by default), pnpm, restores the pnpm store cache, caches t
     enable-turbo-cache: "true" # enable for jobs that run turbo tasks
 ```
 
-| Input                | Required | Default | Description                                                                               |
-| -------------------- | -------- | ------- | ----------------------------------------------------------------------------------------- |
-| `enable-turbo-cache` | No       | `false` | Cache the `.turbo` directory between runs. Set to `'true'` for jobs that run turbo tasks. |
-| `node-version`       | No       | `lts/*` | Node.js version to install                                                                |
+| Input                | Required | Default | Description                                                                                                                                  |
+| -------------------- | -------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cache-store`        | No       | `true`  | Restore and save the pnpm store with `actions/cache`. Set to `'false'` when unpacking a large store takes longer than installing without it. |
+| `enable-turbo-cache` | No       | `false` | Cache the `.turbo` directory between runs. Set to `'true'` for jobs that run turbo tasks.                                                    |
+| `node-version`       | No       | `lts/*` | Node.js version to install                                                                                                                   |
+
+pnpm's [CI guide](https://pnpm.io/continuous-integration) says caching the store isn't guaranteed to make installs faster. Measure both: a restore is a download plus unpacking every file in the store, which for a store of a few GB can take longer than `pnpm install` from the registry.
 
 ---
 
