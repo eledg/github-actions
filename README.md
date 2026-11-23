@@ -18,6 +18,7 @@ Installs Node.js (LTS by default) and pnpm, optionally restores the pnpm store a
 | -------------------- | -------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | `cache-store`        | No       | `false` | Restore and save the pnpm store with `actions/cache`. Set to `'true'` only if measuring shows it beats installing without it.               |
 | `enable-turbo-cache` | No       | `false` | Cache the `.turbo` directory between runs. Set to `'true'` for jobs that run turbo tasks.                                                    |
+| `filter`             | No       | `''`    | pnpm workspace filter for the install (e.g. a package, or `<package>...` with its dependencies). Empty installs everything; no match fails. |
 | `node-version`       | No       | `lts/*` | Node.js version to install                                                                                                                   |
 
 The store cache is off by default. pnpm's [CI guide](https://pnpm.io/continuous-integration) says caching the store isn't guaranteed to make installs faster. On GitHub's runners a cold `pnpm install` was only 3–5 s slower than one from a restored store, but restoring took longer than that in every repo measured. It took 2–18 s for stores under 500 MB, ~50 s for 1 GB and ~60–100 s for 2.2 GB, mostly spent unpacking.
