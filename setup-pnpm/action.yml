@@ -7,6 +7,12 @@ inputs:
       took longer than the few seconds it saved the install, in every repo measured.
     required: false
     default: 'false'
+  filter:
+    description: >-
+      pnpm workspace filter for the install, e.g. a package name, or `<package>...` with its workspace dependencies.
+      Empty installs the whole workspace. The install fails if the filter matches no project.
+    required: false
+    default: ''
   enable-turbo-cache:
     description: Cache the .turbo directory between runs. Set to 'false' for jobs that do not run turbo tasks.
     required: false
@@ -43,5 +49,8 @@ runs:
         key: ${{ runner.os }}-turbo-${{ github.sha }}
         restore-keys: |
           ${{ runner.os }}-turbo-
-    - run: pnpm install --frozen-lockfile
+    # --fail-if-no-match: without it pnpm exits 0 when the filter matches nothing, installing nothing
+    - run: pnpm install --frozen-lockfile ${FILTER:+--filter "$FILTER" --fail-if-no-match}
       shell: bash
+      env:
+        FILTER: ${{ inputs.filter }}
