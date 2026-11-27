@@ -211,6 +211,15 @@ Checks for a newer pnpm version on npm and opens a PR to update the `packageMana
     assignees: your-github-username
 ```
 
+To merge patch and minor upgrades automatically once required checks pass, pass a PAT and set `auto-merge-update-types`:
+
+```yaml
+- uses: eledg/github-actions/update-pnpm@v1
+  with:
+    github-token: ${{ secrets.PAT_TOKEN }}
+    auto-merge-update-types: patch,minor
+```
+
 | Input          | Required | Default | Description                                                    |
 | -------------- | -------- | ------- | -------------------------------------------------------------- |
 | `github-token` | Yes      | —       | GitHub token with `contents: write` and `pull-requests: write` |
@@ -218,6 +227,8 @@ Checks for a newer pnpm version on npm and opens a PR to update the `packageMana
 | `assignees`    | No       | `''`    | Comma or newline separated list of pull request assignees      |
 | `labels`       | No       | `build` | Labels to apply to the pull request                            |
 | `node-version` | No       | `lts/*` | Node.js version to install                                     |
+| `auto-merge-update-types`         | No       | `''`    | Comma-separated bump types (`patch`, `minor`, `major`) whose PR gets auto-merge enabled. Empty leaves every PR for manual merge. See [`enable-auto-merge`](#enable-auto-merge) |
+| `auto-merge-min-release-age-days` | No       | `5`     | Only enable auto-merge once the new version has been published this many days. A younger release still gets its PR; a later run enables auto-merge on it |
 
 Requires `contents: write` and `pull-requests: write` permissions on the calling workflow.
 
@@ -268,6 +279,36 @@ Requires `pull-requests: write` permission on the calling workflow.
 
 ---
 
+### `enable-auto-merge`
+
+Turns on GitHub [auto-merge](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/automatically-merging-a-pull-request) for a dependency-update PR when its semver update type is allowed, so it merges once the branch's required checks pass. When the type is not allowed (for example, a grouped Dependabot PR that has since picked up a major), it turns auto-merge off again. Used internally by [`update-pnpm`](#update-pnpm) and [`update-turbo`](#update-turbo), and by the [Dependabot auto-merge](#dependabot-auto-merge) workflow below.
+
+Auto-merge waits for the base branch's required status checks, so it is only as safe as those checks. The repository must allow auto-merge (Settings → General → Allow auto-merge).
+
+Pass a PAT or GitHub App token, not `secrets.GITHUB_TOKEN`. GitHub does not start workflow runs for events made with `GITHUB_TOKEN`, so a merge it enabled would not run the base branch's `push` workflows (release, deploy).
+
+```yaml
+- uses: eledg/github-actions/enable-auto-merge@v1
+  with:
+    github-token: ${{ secrets.PAT_TOKEN }}
+    pr-number: ${{ github.event.pull_request.number }}
+    update-type: ${{ steps.metadata.outputs.update-type }}
+```
+
+| Input                  | Required | Default        | Description                                                                                          |
+| ---------------------- | -------- | -------------- | ---------------------------------------------------------------------------------------------------- |
+| `github-token`         | Yes      | —              | PAT or GitHub App token with `contents: write` and `pull-requests: write`                            |
+| `pr-number`            | Yes      | —              | Pull request number                                                                                  |
+| `update-type`          | Yes      | —              | `patch`, `minor` or `major`, or the `dependabot/fetch-metadata` form (`version-update:semver-patch`). Empty or unknown counts as not allowed |
+| `allowed-update-types` | No       | `patch,minor`  | Comma-separated update types to auto-merge                                                           |
+| `merge-method`         | No       | `squash`       | `squash`, `merge` or `rebase`                                                                        |
+
+| Output    | Description                                                    |
+| --------- | -------------------------------------------------------------- |
+| `enabled` | `true` if auto-merge is enabled on the PR afterwards, otherwise `false` |
+
+---
+
 ### `update-turbo`
 
 Checks for a newer turbo version on npm and opens a PR to update using `@turbo/codemod`, which migrates `turbo.json` and other config files automatically. No-ops if already on the latest version.
@@ -286,6 +327,15 @@ Requires dependencies to already be installed — run [`setup-pnpm`](#setup-pnpm
     assignees: your-github-username
 ```
 
+To merge patch and minor upgrades automatically once required checks pass, pass a PAT and set `auto-merge-update-types`:
+
+```yaml
+- uses: eledg/github-actions/update-turbo@v1
+  with:
+    github-token: ${{ secrets.PAT_TOKEN }}
+    auto-merge-update-types: patch,minor
+```
+
 | Input          | Required | Default | Description                                                    |
 | -------------- | -------- | ------- | -------------------------------------------------------------- |
 | `github-token` | Yes      | —       | GitHub token with `contents: write` and `pull-requests: write` |
@@ -293,6 +343,8 @@ Requires dependencies to already be installed — run [`setup-pnpm`](#setup-pnpm
 | `assignees`    | No       | `''`    | Comma or newline separated list of pull request assignees      |
 | `labels`       | No       | `build` | Labels to apply to the pull request                            |
 | `node-version` | No       | `lts/*` | Node.js version to install                                     |
+| `auto-merge-update-types`         | No       | `''`    | Comma-separated bump types (`patch`, `minor`, `major`) whose PR gets auto-merge enabled. Empty leaves every PR for manual merge. See [`enable-auto-merge`](#enable-auto-merge) |
+| `auto-merge-min-release-age-days` | No       | `5`     | Only enable auto-merge once the new version has been published this many days. A younger release still gets its PR; a later run enables auto-merge on it |
 
 Requires `contents: write` and `pull-requests: write` permissions on the calling workflow.
 
@@ -364,6 +416,48 @@ jobs:
 [`dependabot/fetch-metadata`](https://github.com/dependabot/fetch-metadata) is GitHub's own action for reading Dependabot PR metadata (dependency name, versions, and `update-type`) without parsing the PR title. For grouped updates it reports the highest-severity update type across the group, but its `previous-version`/`new-version` outputs come back blank — `pr-body` is passed through so Claude can fall back on Dependabot's own per-package version table in the PR description.
 
 Requires `pull-requests: write` permission on the calling workflow, and the [Claude GitHub App](https://github.com/apps/claude) installed on the repository.
+
+---
+
+### Dependabot auto-merge
+
+Add a workflow to any repo that uses Dependabot, so that patch and minor PRs merge themselves once required checks pass, and majors are left for review. Uses [`enable-auto-merge`](#enable-auto-merge) under the hood. Pair it with a Dependabot [`cooldown`](https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference#cooldown-) so a release has been public for a few days before it can merge unattended.
+
+Like the major version review, it triggers on `pull_request_target` because a Dependabot `pull_request` run gets no secrets. It never checks out the PR's code. It re-runs when Dependabot itself pushes to the PR (a rebase, or a grouped PR gaining another update), so auto-merge is turned off if the group now includes a major. Pushes by anyone else are skipped.
+
+```yaml
+name: Dependabot auto-merge
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  auto-merge:
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      (github.event.action != 'synchronize' || github.event.sender.login == 'dependabot[bot]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Enable auto-merge for patch and minor updates
+        uses: eledg/github-actions/enable-auto-merge@v1
+        with:
+          github-token: ${{ secrets.PAT_TOKEN }}
+          pr-number: ${{ github.event.pull_request.number }}
+          update-type: ${{ steps.metadata.outputs.update-type }}
+```
+
+For a grouped PR, `update-type` is the highest update type in the group, so a group containing a major is never auto-merged.
 
 ---
 

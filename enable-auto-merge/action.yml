@@ -1,0 +1,85 @@
+name: Enable auto-merge
+description: >
+  Turns on GitHub auto-merge for a dependency-update PR when its semver update
+  type is in the allowed list, so it merges once the branch's required checks
+  pass. Turns auto-merge off again when the update type is not allowed (e.g. a
+  grouped PR that has since picked up a major).
+inputs:
+  github-token:
+    description: >
+      Personal access token or GitHub App token with contents:write and
+      pull-requests:write. Do not pass secrets.GITHUB_TOKEN: a merge made
+      with it does not trigger push workflows on the base branch, so release
+      and deploy workflows would not run.
+    required: true
+  pr-number:
+    description: Pull request number.
+    required: true
+  update-type:
+    description: >
+      Semver update type of the PR: patch, minor or major, or the
+      dependabot/fetch-metadata form (version-update:semver-patch etc.).
+      Empty or unrecognised values are treated as not allowed.
+    required: true
+  allowed-update-types:
+    description: Comma-separated update types to auto-merge.
+    required: false
+    default: patch,minor
+  merge-method:
+    description: Merge method once checks pass (squash, merge or rebase).
+    required: false
+    default: squash
+outputs:
+  enabled:
+    description: "'true' if auto-merge is enabled on the PR after this step, otherwise 'false'."
+    value: ${{ steps.auto-merge.outputs.enabled }}
+runs:
+  using: composite
+  steps:
+    - name: Enable or disable auto-merge
+      id: auto-merge
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        # No checkout needed: tell gh which repo to act on.
+        GH_REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+        UPDATE_TYPE: ${{ inputs.update-type }}
+        ALLOWED: ${{ inputs.allowed-update-types }}
+        MERGE_METHOD: ${{ inputs.merge-method }}
+      run: |
+        set -euo pipefail
+
+        if ! [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+          echo "::error::pr-number must be a number, got '$PR_NUMBER'."
+          exit 1
+        fi
+
+        case "$MERGE_METHOD" in
+          squash|merge|rebase) ;;
+          *) echo "::error::merge-method must be squash, merge or rebase, got '$MERGE_METHOD'."; exit 1 ;;
+        esac
+
+        # Accept both "minor" and "version-update:semver-minor".
+        type="${UPDATE_TYPE#version-update:semver-}"
+
+        allowed=false
+        if [ -n "$type" ]; then
+          case ",${ALLOWED// /}," in
+            *",$type,"*) allowed=true ;;
+          esac
+        fi
+
+        if [ "$allowed" = true ]; then
+          gh pr merge "$PR_NUMBER" --auto "--$MERGE_METHOD"
+          echo "Auto-merge enabled for #$PR_NUMBER ($type update)."
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        echo "Update type '${type:-unknown}' is not in '$ALLOWED'; leaving #$PR_NUMBER for manual merge."
+        if [ "$(gh pr view "$PR_NUMBER" --json autoMergeRequest --jq '.autoMergeRequest != null')" = "true" ]; then
+          gh pr merge "$PR_NUMBER" --disable-auto
+          echo "Auto-merge disabled for #$PR_NUMBER."
+        fi
+        echo "enabled=false" >> "$GITHUB_OUTPUT"
